@@ -1,0 +1,162 @@
+[
+  {
+    "id": "dana-1",
+    "name": "عطر رجالي Tobacco Jam 60 Assaf",
+    "brand": "assaf",
+    "purchasePrice": 0,
+    "representativePrice": 0,
+    "sellingPrice": 50
+  },
+  {
+    "id": "dana-2",
+    "name": "بديل عطر برادا",
+    "brand": "دانا بلس",
+    "purchasePrice": 49.5,
+    "representativePrice": 67.5,
+    "sellingPrice": 90
+  },
+  {
+    "id": "dana-3",
+    "name": "Alien 90ml EDP",
+    "brand": "دانا بلس",
+    "purchasePrice": 214.5,
+    "representativePrice": 292.5,
+    "sellingPrice": 390
+  },
+  {
+    "id": "dana-4",
+    "name": "مرطب الجسم من باث اند بودي ووركس",
+    "brand": "دانا بلس",
+    "purchasePrice": 33,
+    "representativePrice": 45,
+    "sellingPrice": 60
+  },
+  {
+    "id": "dana-5",
+    "name": "سيتافيل ديرما كونترول مرطب ماص للزيوت مع واقي شمسي واسع الطيف",
+    "brand": "دانا بلس",
+    "purchasePrice": 44,
+    "representativePrice": 60,
+    "sellingPrice": 80
+  },
+  {
+    "id": "dana-6",
+    "name": "سيليماكس ريتينال شوت تايتينغ بوستر - 15 مل",
+    "brand": "دانا بلس",
+    "purchasePrice": 46.75,
+    "representativePrice": 63.75,
+    "sellingPrice": 85
+  },
+  {
+    "id": "dana-7",
+    "name": "غسول جسم من باث اند بودي 295ml حجم كبير",
+    "brand": "دانا بلس",
+    "purchasePrice": 35.75,
+    "representativePrice": 48.75,
+    "sellingPrice": 65
+  },
+  {
+    "id": "dana-8",
+    "name": "مجموعة مرطب الشفاه سكويز مي مور من ايلف - بنكهة العلكة والكرز - 6 غرام لكل عبوة",
+    "brand": "دانا بلس",
+    "purchasePrice": 22,
+    "representativePrice": 30,
+    "sellingPrice": 40
+  },
+  {
+    "id": "dana-9",
+    "name": "مرطب الجسم من باث اند بودي ووركس",
+    "brand": "دانا بلس",
+    "purchasePrice": 33,
+    "representativePrice": 45,
+    "sellingPrice": 60
+  },
+  {
+    "id": "dana-10",
+    "name": "مرطب الجسم من ثاوزند ويشيز",
+    "brand": "دانا بلس",
+    "purchasePrice": 33,
+    "representativePrice": 45,
+    "sellingPrice": 60
+  },
+  {
+    "id": "dana-11",
+    "name": "غسول بان اوكسيل لعلاج حب الشباب للجسم 10%. حجم كبير 156 غرام",
+    "brand": "دانا بلس",
+    "purchasePrice": 41.25,
+    "representativePrice": 56.25,
+    "sellingPrice": 75
+  },
+  {
+    "id": "dana-12",
+    "name": "ماي واي 15مل ylang",
+    "brand": "دانا بلس",
+    "purchasePrice": 0,
+    "representativePrice": 0,
+    "sellingPrice": 50
+  },
+  {
+    "id": "dana-13",
+    "name": "ليبر ميني من ysl",
+    "brand": "دانا بلس",
+    "purchasePrice": 0,
+    "representativePrice": 0,
+    "sellingPrice": 50
+  },
+  {
+    "id": "dana-14",
+    "name": "عطر يو الرجالي - انتنسلي",
+    "brand": "دانا بلس",
+    "purchasePrice": 195.25,
+    "representativePrice": 266.25,
+    "sellingPrice": 355
+  },
+  {
+    "id": "dana-15",
+    "name": "عطر ليبر YSL edp",
+    "brand": "ysl",
+    "purchasePrice": 211.75,
+    "representativePrice": 288.75,
+    "sellingPrice": 385
+  },
+  {
+    "id": "dana-16",
+    "name": "ليبر بيري كراش",
+    "brand": "دانا بلس",
+    "purchasePrice": 0,
+    "representativePrice": 0,
+    "sellingPrice": 50
+  },
+  {
+    "id": "dana-17",
+    "name": "سيرافي ألترا - لوشن مرطب خفيف - عامل حماية من الشمس 30 - 52 مل",
+    "brand": "دانا بلس",
+    "purchasePrice": 44,
+    "representativePrice": 60,
+    "sellingPrice": 80
+  },
+  {
+    "id": "dana-18",
+    "name": "غسول يوسيرين المتطور للجسم والوجه (500 مل)",
+    "brand": "دانا بلس",
+    "purchasePrice": 46.75,
+    "representativePrice": 63.75,
+    "sellingPrice": 85
+  },
+  {
+    "id": "dana-19",
+    "name": "اروجيت بينك",
+    "brand": "دانا بلس",
+    "purchasePrice": 0,
+    "representativePrice": 0,
+    "sellingPrice": 50
+  },
+  {
+    "id": "dana-20",
+    "name": "بيلي ايليش",
+    "brand": "دانا بلس",
+    "purchasePrice": 0,
+    "representativePrice": 0,
+    "sellingPrice": 50
+  }
+]
