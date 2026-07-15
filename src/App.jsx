@@ -201,10 +201,11 @@ function LoginScreen({ unavailable, onSuccess }) {
     try {
       const response = await fetch('/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) })
       const result = response.headers.get('content-type')?.includes('application/json') ? await response.json() : null
+      if (response.status === 503) throw new Error('unavailable')
       if (!response.ok || result?.ok !== true) throw new Error('invalid')
       onSuccess()
-    } catch {
-      setError('بيانات الدخول غير صحيحة أو أن خدمة الدخول غير متاحة.')
+    } catch (error) {
+      setError(error.message === 'unavailable' ? 'خدمة الدخول غير مُعدّة. أضيفي أسرار Pages ثم أعيدي النشر.' : 'اسم المستخدم أو كلمة المرور غير صحيحين.')
     }
   }
   return <main className="auth-shell" dir="rtl"><form className="auth-card" onSubmit={login}><span className="brand-mark">د+</span><p className="eyebrow">نظام إدارة مبيعات المندوبات</p><h1>مرحبًا دانا</h1><p>{unavailable ? 'شغّلي التطبيق عبر Cloudflare Pages بعد إعداد أسرار الدخول.' : 'سجّلي الدخول لمتابعة حساباتك.'}</p><label className="field">اسم المستخدم<input value={username} autoComplete="username" onChange={(event) => setUsername(event.target.value)} required /></label><label className="field">كلمة المرور<input value={password} type="password" autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} required /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button" type="submit">دخول آمن</button></form></main>
