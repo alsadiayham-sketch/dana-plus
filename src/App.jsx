@@ -60,24 +60,10 @@ function saleValues(sale, products) {
 }
 
 function App() {
-  const [auth, setAuth] = useState('checking')
   const [activePage, setActivePage] = useState('dashboard')
   const [data, setData] = useState(loadData)
   const [notice, setNotice] = useState('')
   const [draft, setDraft] = useState(() => newSaleDraft())
-
-  useEffect(() => {
-    fetch('/api/session', { credentials: 'same-origin' })
-      .then(async (response) => {
-        if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-          setAuth('unauthenticated')
-          return
-        }
-        const session = await response.json()
-        setAuth(session.authenticated === true ? 'authenticated' : 'unauthenticated')
-      })
-      .catch(() => setAuth('unavailable'))
-  }, [])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
@@ -148,9 +134,6 @@ function App() {
     representatives: current.representatives.map((representative) => representative.id === id ? { ...representative, [field]: value } : representative),
   }))
 
-  if (auth === 'checking') return <main className="auth-shell" dir="rtl"><div className="auth-card"><span className="brand-mark">د+</span><h1>دانا بلس</h1><p>جارٍ التحقق من الجلسة…</p></div></main>
-  if (auth !== 'authenticated') return <LoginScreen unavailable={auth === 'unavailable'} onSuccess={() => setAuth('authenticated')} />
-
   const navItems = [
     ['dashboard', 'لوحة التحكم'],
     ['sale', 'تسجيل عملية بيع'],
@@ -189,26 +172,6 @@ function App() {
 
 function newSaleDraft() {
   return { repId: 'r1', items: [{ productId: 'dana-1', quantity: 1 }], delivery: 'pickup', deliveryFee: 0, customerName: '', status: 'جديد', date: new Date().toISOString().slice(0, 10), notes: '' }
-}
-
-function LoginScreen({ unavailable, onSuccess }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const login = async (event) => {
-    event.preventDefault()
-    setError('')
-    try {
-      const response = await fetch('/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) })
-      const result = response.headers.get('content-type')?.includes('application/json') ? await response.json() : null
-      if (response.status === 503) throw new Error('unavailable')
-      if (!response.ok || result?.ok !== true) throw new Error('invalid')
-      onSuccess()
-    } catch (error) {
-      setError(error.message === 'unavailable' ? 'خدمة الدخول غير مُعدّة. أضيفي أسرار Pages ثم أعيدي النشر.' : 'اسم المستخدم أو كلمة المرور غير صحيحين.')
-    }
-  }
-  return <main className="auth-shell" dir="rtl"><form className="auth-card" onSubmit={login}><span className="brand-mark">د+</span><p className="eyebrow">نظام إدارة مبيعات المندوبات</p><h1>مرحبًا دانا</h1><p>{unavailable ? 'شغّلي التطبيق عبر Cloudflare Pages بعد إعداد أسرار الدخول.' : 'سجّلي الدخول لمتابعة حساباتك.'}</p><label className="field">اسم المستخدم<input value={username} autoComplete="username" onChange={(event) => setUsername(event.target.value)} required /></label><label className="field">كلمة المرور<input value={password} type="password" autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} required /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button" type="submit">دخول آمن</button></form></main>
 }
 
 function Dashboard({ metrics, orderCount, representatives, products, onRepresentatives }) {
