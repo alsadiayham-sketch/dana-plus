@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import catalogSeed from './catalog-seed.json'
+import Catalog from './Catalog'
+import { publicCatalogPayload } from './catalogData'
 import { auth, db, firebaseConfigured } from './firebase'
 import './App.css'
 
@@ -100,6 +102,7 @@ function App() {
   const [remoteReady, setRemoteReady] = useState(false)
   const [remoteError, setRemoteError] = useState('')
   const [modal, setModal] = useState('')
+  const [editingProduct, setEditingProduct] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
   const applyingSnapshot = useRef(false)
 
@@ -134,6 +137,12 @@ function App() {
     setDoc(doc(db, 'projects', 'dana-plus'), { ...data, updatedAt: serverTimestamp() }, { merge: true })
       .catch(() => setRemoteError('تعذر حفظ التعديل في Firebase.'))
   }, [authState, data, remoteReady])
+
+  useEffect(() => {
+    if (authState !== 'authenticated' || !remoteReady || !db) return
+    setDoc(doc(db, 'publicCatalog', 'dana-plus'), publicCatalogPayload(data.products))
+      .catch(() => setRemoteError('تعذر نشر كتالوج المندوبات في Firebase.'))
+  }, [authState, data.products, remoteReady])
 
   const metrics = useMemo(() => data.sales.filter((sale) => sale.status === 'مكتمل').reduce((sum, sale) => {
     const values = saleValues(sale, data.products)
@@ -200,6 +209,10 @@ function App() {
       return updated
     }),
   }))
+  const saveProductDetails = (product) => setData((current) => ({
+    ...current,
+    products: current.products.map((item) => item.id === product.id ? { ...item, ...product } : item),
+  }))
 
   const addProduct = (product) => {
     const id = `product-${Date.now()}`
@@ -233,6 +246,7 @@ function App() {
   const updatePaymentStatus = (id, status) => setData((current) => ({ ...current, payments: current.payments.map((payment) => payment.id === id ? { ...payment, status } : payment) }))
   const updateSaleStatus = (id, status) => setData((current) => ({ ...current, sales: current.sales.map((sale) => sale.id === id ? { ...sale, status } : sale) }))
 
+  if (window.location.pathname === '/catalog') return <Catalog />
   if (authState === 'checking') return <main className="auth-shell" dir="rtl"><div className="auth-card"><span className="brand-mark">د+</span><h1>دانا بلس</h1><p>جارٍ فتح مساحة العمل…</p></div></main>
   if (authState !== 'authenticated') return <LoginScreen unavailable={authState === 'unavailable'} onLogin={async (email, password) => signInWithEmailAndPassword(auth, email, password)} />
 
@@ -269,13 +283,14 @@ function App() {
         {activePage === 'sale' && <SaleForm draft={draft} setDraft={setDraft} representatives={data.representatives} products={data.products} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onSubmit={saveSale} />}
         {activePage === 'sales' && <SalesTable sales={data.sales} products={data.products} representatives={data.representatives} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onStatusChange={updateSaleStatus} />}
         {activePage === 'cancelled' && <SalesTable sales={data.sales.filter((sale) => sale.status === 'ملغي')} products={data.products} representatives={data.representatives} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onStatusChange={updateSaleStatus} title="الطلبات الملغاة" />}
-        {activePage === 'products' && <Products products={data.products} onChange={updateProduct} onRemove={removeProduct} onAdd={() => setModal('product')} />}
+        {activePage === 'products' && <Products products={data.products} onChange={updateProduct} onRemove={removeProduct} onAdd={() => setModal('product')} onEdit={setEditingProduct} />}
         {activePage === 'representatives' && <Representatives summaries={repSummary} onAdd={() => setModal('representative')} onChange={updateRepresentative} />}
         {activePage === 'payments' && <Payments representatives={repSummary} payments={data.payments} onSave={savePayment} onStatusChange={updatePaymentStatus} />}
         {activePage === 'pickup-locations' && <PickupLocations locations={data.pickupLocations} onAdd={() => setModal('pickup')} onChange={updatePickupLocation} onRemove={removePickupLocation} />}
         {activePage === 'delivery' && <Delivery deliveries={data.deliveries} onChange={updateDelivery} />}
       </main>
       {modal === 'product' && <ProductModal onClose={() => setModal('')} onSave={(product) => { addProduct(product); setModal('') }} />}
+      {editingProduct && <ProductModal product={editingProduct} onClose={() => setEditingProduct(null)} onSave={(product) => { saveProductDetails(product); setEditingProduct(null) }} />}
       {modal === 'representative' && <RepresentativeModal onClose={() => setModal('')} onSave={(representative) => { addRepresentative(representative); setModal('') }} />}
       {modal === 'pickup' && <PickupLocationModal onClose={() => setModal('')} onSave={(name) => { addPickupLocation(name); setModal('') }} />}
       {confirmation && <OrderConfirmation sale={confirmation} products={data.products} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onClose={() => { setConfirmation(null); setActivePage('sales') }} />}
@@ -337,8 +352,8 @@ function ProductPicker({ item, products, onSelect, onChange, onRemove }) {
   return <div className="sale-item product-picker"><div className="product-search"><input aria-label="ابحثي عن منتج" placeholder="ابحثي باسم المنتج…" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <div className="search-results">{matches.slice(0, 6).map((product) => <button type="button" key={product.id} onClick={() => { onSelect(product.id); setQuery('') }}><span>{product.name}</span><small>{currency.format(normalizedSalePrice(product))}</small></button>)}</div>}</div><strong className="selected-product">{selected?.name || 'ابحثي واختاري منتجًا'}</strong><label className="compact-item-field">الكمية<input aria-label="الكمية" type="number" min="1" value={item.quantity} onChange={(event) => onChange('quantity', event.target.value)} /></label><label className="sale-price-field">سعر البيع الفعلي<input aria-label="سعر البيع الفعلي" type="number" min={wholesalePrice} value={selected ? normalizedSalePrice(selected, item.salePrice) : ''} disabled={!selected} onChange={(event) => onChange('salePrice', Number(event.target.value) || wholesalePrice)} /><small>{selected ? `الحد الأدنى سعر الجملة: ${currency.format(wholesalePrice)}` : 'اختاري منتجًا أولًا'}</small></label>{onRemove && <button className="remove-button" type="button" onClick={onRemove}>حذف</button>}</div>
 }
 
-function Products({ products, onChange, onRemove, onAdd }) {
-  return <section className="panel table-panel"><div className="panel-heading"><div><h2>كتالوج دانا بلس</h2><p>عدّلي سعر التكلفة وسعر الجملة وسعر البيع المقترح لكل منتج.</p></div><button className="primary-button" onClick={onAdd}>إضافة منتج</button></div><div className="product-table"><div className="product-table-head"><span>المنتج والتصنيف</span><span>سعر التكلفة</span><span>سعر الجملة</span><span>سعر البيع المقترح</span><span>إجراء</span></div>{products.map((product) => <div className="product-table-row" key={product.id}><div><input aria-label="اسم المنتج" value={product.name} onChange={(event) => onChange(product.id, 'name', event.target.value)} /><input aria-label="التصنيف" className="sub-input" value={product.category} onChange={(event) => onChange(product.id, 'category', event.target.value)} /></div>{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <input aria-label={`${field} ${product.name}`} key={field} type="number" min={field === 'sellingPrice' ? product.representativePrice : 0} value={product[field]} onChange={(event) => onChange(product.id, field, event.target.value)} />)}<button className="remove-button" onClick={() => onRemove(product.id)}>حذف</button></div>)}</div></section>
+function Products({ products, onChange, onRemove, onAdd, onEdit }) {
+  return <section className="panel table-panel"><div className="panel-heading"><div><h2>كتالوج دانا بلس</h2><p>عدّلي الأسعار، وأضيفي الصور والوصف والأحجام من تفاصيل المنتج لتظهر للمندوبات.</p></div><button className="primary-button" onClick={onAdd}>إضافة منتج</button></div><div className="product-table"><div className="product-table-head"><span>المنتج والتصنيف</span><span>سعر التكلفة</span><span>سعر الجملة</span><span>سعر البيع المقترح</span><span>إجراء</span></div>{products.map((product) => <div className="product-table-row" key={product.id}><div><input aria-label="اسم المنتج" value={product.name} onChange={(event) => onChange(product.id, 'name', event.target.value)} /><input aria-label="التصنيف" className="sub-input" value={product.category} onChange={(event) => onChange(product.id, 'category', event.target.value)} /></div>{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <input aria-label={`${field} ${product.name}`} key={field} type="number" min={field === 'sellingPrice' ? product.representativePrice : 0} value={product[field]} onChange={(event) => onChange(product.id, field, event.target.value)} />)}<div className="product-actions"><button className="text-button" onClick={() => onEdit(product)}>تفاصيل</button><button className="remove-button" onClick={() => onRemove(product.id)}>حذف</button></div></div>)}</div></section>
 }
 
 function Representatives({ summaries, onAdd, onChange }) {
@@ -381,14 +396,30 @@ function SalesTable({ sales, products, representatives, onStatusChange, title = 
   return <section className="panel table-panel"><div className="panel-heading"><div><h2>{title}</h2><p>{shown.length} عمليات ظاهرة · الأرباح لا تظهر إلا للطلبات المكتملة</p></div><label className="filter-field">تصفية الحالة<select className="status-filter" value={filter} onChange={(event) => setFilter(event.target.value)}><option>الكل</option><option>جديد</option><option>قيد التجهيز</option><option>مكتمل</option><option>ملغي</option></select></label></div><div className="sales-table"><div className="sales-head"><span>التاريخ</span><span>العميلة / المندوبة</span><span>المنتجات</span><span>الحالة</span><span>إجمالي العميلة</span><span>ربح دانا</span></div>{shown.map((sale) => { const value = saleValues(sale, products); const representative = representatives.find((item) => item.id === sale.repId); return <div className="sales-row" key={sale.id}><span data-label="التاريخ">{sale.date}</span><span data-label="العميلة / المندوبة"><strong>{sale.customerName}</strong><small>{representative?.name}</small></span><span data-label="المنتجات">{(sale.items || []).map((item) => `${products.find((product) => product.id === item.productId)?.name || 'منتج'} × ${item.quantity}`).join('، ')}</span><div className="status-control" data-label="الحالة"><StatusBadge status={sale.status} /><label className="sr-only" htmlFor={`status-${sale.id}`}>تحديث حالة طلب {sale.customerName}</label><select id={`status-${sale.id}`} value={sale.status} onChange={(event) => onStatusChange(sale.id, event.target.value)}><option>جديد</option><option>قيد التجهيز</option><option>مكتمل</option><option>ملغي</option></select></div><strong data-label="إجمالي العميلة">{currency.format(value.total)}</strong><strong className="profit" data-label="ربح دانا">{sale.status === 'مكتمل' ? currency.format(value.danaProfit) : 'غير معتمد بعد'}</strong></div> })}</div></section>
 }
 
-function ProductModal({ onClose, onSave }) {
-  const [product, setProduct] = useState({ name: '', brand: '', category: '', purchasePrice: '', representativePrice: '', sellingPrice: '' })
+function ProductModal({ product: existingProduct, onClose, onSave }) {
+  const [product, setProduct] = useState(() => {
+    const existing = existingProduct || {}
+    return {
+      name: '', brand: '', category: '', purchasePrice: '', representativePrice: '', sellingPrice: '', description: '',
+      ...existing,
+      images: Array.isArray(existing.images) ? existing.images.join('\n') : '',
+      sizes: Array.isArray(existing.sizes) ? existing.sizes.join(', ') : '',
+    }
+  })
   const submit = (event) => {
     event.preventDefault()
     const representativePrice = Number(product.representativePrice)
-    onSave({ ...product, purchasePrice: Number(product.purchasePrice), representativePrice, sellingPrice: Math.max(representativePrice, Number(product.sellingPrice)) })
+    const images = product.images.split(/[\n,]/).map((url) => url.trim()).filter((url) => {
+      try {
+        return ['https:', 'http:'].includes(new URL(url).protocol)
+      } catch {
+        return false
+      }
+    })
+    const sizes = [...new Set(product.sizes.split(',').map((size) => size.trim()).filter(Boolean))]
+    onSave({ ...product, description: product.description.trim(), images, sizes, purchasePrice: Number(product.purchasePrice), representativePrice, sellingPrice: Math.max(representativePrice, Number(product.sellingPrice)) })
   }
-  return <Modal title="إضافة منتج" onClose={onClose}><form className="modal-form" onSubmit={submit}><Field label="اسم المنتج"><input autoFocus required value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} /></Field><div className="form-columns"><Field label="العلامة التجارية"><input required value={product.brand} onChange={(event) => setProduct({ ...product, brand: event.target.value })} /></Field><Field label="التصنيف"><input required value={product.category} onChange={(event) => setProduct({ ...product, category: event.target.value })} /></Field></div><div className="form-columns"><Field label="سعر التكلفة"><input required type="number" min="0" value={product.purchasePrice} onChange={(event) => setProduct({ ...product, purchasePrice: event.target.value })} /></Field><Field label="سعر الجملة"><input required type="number" min="0" value={product.representativePrice} onChange={(event) => setProduct({ ...product, representativePrice: event.target.value })} /></Field><Field label="سعر البيع المقترح"><input required type="number" min={product.representativePrice || 0} value={product.sellingPrice} onChange={(event) => setProduct({ ...product, sellingPrice: event.target.value })} /></Field></div><button className="primary-button">حفظ المنتج</button></form></Modal>
+  return <Modal title={existingProduct ? 'تفاصيل المنتج' : 'إضافة منتج'} onClose={onClose}><form className="modal-form" onSubmit={submit}><Field label="اسم المنتج"><input autoFocus required value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} /></Field><div className="form-columns"><Field label="العلامة التجارية"><input required value={product.brand} onChange={(event) => setProduct({ ...product, brand: event.target.value })} /></Field><Field label="التصنيف"><input required value={product.category} onChange={(event) => setProduct({ ...product, category: event.target.value })} /></Field></div><Field label="وصف المنتج (اختياري)"><textarea value={product.description} onChange={(event) => setProduct({ ...product, description: event.target.value })} /></Field><Field label="روابط الصور (اختياري، رابط في كل سطر)"><textarea dir="ltr" value={product.images} onChange={(event) => setProduct({ ...product, images: event.target.value })} placeholder="https://i.ibb.co/..." /></Field><Field label="الأحجام (اختياري، مفصولة بفواصل)"><input value={product.sizes} onChange={(event) => setProduct({ ...product, sizes: event.target.value })} placeholder="50 مل، 100 مل" /></Field><div className="form-columns"><Field label="سعر التكلفة"><input required type="number" min="0" value={product.purchasePrice} onChange={(event) => setProduct({ ...product, purchasePrice: event.target.value })} /></Field><Field label="سعر الجملة"><input required type="number" min="0" value={product.representativePrice} onChange={(event) => setProduct({ ...product, representativePrice: event.target.value })} /></Field><Field label="سعر البيع المقترح"><input required type="number" min={product.representativePrice || 0} value={product.sellingPrice} onChange={(event) => setProduct({ ...product, sellingPrice: event.target.value })} /></Field></div><button className="primary-button">حفظ المنتج</button></form></Modal>
 }
 
 function RepresentativeModal({ onClose, onSave }) {

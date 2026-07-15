@@ -62,8 +62,9 @@ button:active { transform: translateY(1px); }
 .sale-form, .payment-form { display: grid; gap: 18px; }
 .form-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .field { display: grid; gap: 7px; color: #52364b; font-size: 14px; font-weight: 700; }
-.field input, .field select, .product-table-row input, .representative-card input, .delivery-row input, .sale-item input, .sale-item select, .rep-search { width: 100%; min-height: 43px; border: 1px solid #cdaebb; border-radius: 7px; padding: 9px 11px; background: #ffffff; color: #341b34; }
-.field input:hover, .field select:hover, .product-table-row input:hover, .representative-card input:hover, .delivery-row input:hover, .sale-item input:hover, .rep-search:hover { border-color: #a76b86; }
+.field input, .field select, .field textarea, .product-table-row input, .representative-card input, .delivery-row input, .sale-item input, .sale-item select, .rep-search { width: 100%; min-height: 43px; border: 1px solid #cdaebb; border-radius: 7px; padding: 9px 11px; background: #ffffff; color: #341b34; }
+.field textarea { min-height: 88px; resize: vertical; }
+.field input:hover, .field select:hover, .field textarea:hover, .product-table-row input:hover, .representative-card input:hover, .delivery-row input:hover, .sale-item input:hover, .rep-search:hover { border-color: #a76b86; }
 .line-items { display: grid; gap: 10px; padding: 15px 0; border-top: 1px solid #ecdee6; border-bottom: 1px solid #ecdee6; }
 .line-items-heading { align-items: center; }
 .sale-item { display: grid; grid-template-columns: minmax(0, 1fr) 100px 56px; gap: 10px; }
@@ -99,9 +100,11 @@ button:active { transform: translateY(1px); }
 .status-cancelled { background: #fbe6e9; color: #a02c45; }
 .status-neutral { background: #f0e7ec; color: #674f5e; }
 .filter-field { display: grid; gap: 5px; color: #6c5262; font-size: 11px; font-weight: 700; }
-.product-table-head, .product-table-row { display: grid; grid-template-columns: 2.3fr repeat(3, 1fr) 80px; gap: 12px; align-items: center; padding: 12px 8px; }
+.product-table-head, .product-table-row { display: grid; grid-template-columns: 2.3fr repeat(3, 1fr) 110px; gap: 12px; align-items: center; padding: 12px 8px; }
 .product-table-row { border-bottom: 1px solid #eee2e9; font-size: 13px; }
 .product-table-row input { min-height: 38px; padding: 8px; direction: rtl; }
+.product-actions { display: grid; gap: 4px; }
+.product-actions .text-button { min-height: 32px; padding: 2px 0; }
 .sub-input { margin-top: 5px; color: #6e5565 !important; font-size: 12px; }
 .rep-search { max-width: 330px; margin-top: 18px; }
 .representative-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
@@ -216,7 +219,7 @@ h2 { font-weight: 700; }
 .panel { border-color: #eadde5; }
 .metric-card { min-height: 116px; box-shadow: 0 2px 5px rgba(52, 27, 52, .035); }
 .metric-card.accent { box-shadow: inset 0 3px 0 #9d315f, 0 2px 5px rgba(52, 27, 52, .035); }
-.field input:focus, .field select:focus, .product-table-row input:focus, .representative-card input:focus, .delivery-row input:focus, .sale-item input:focus, .sale-item select:focus, .rep-search:focus, .status-control select:focus, .payment-row select:focus, .status-filter:focus { border-color: #9d315f; box-shadow: 0 0 0 3px rgba(157, 49, 95, .16); outline: 0; }
+.field input:focus, .field select:focus, .field textarea:focus, .product-table-row input:focus, .representative-card input:focus, .delivery-row input:focus, .sale-item input:focus, .sale-item select:focus, .rep-search:focus, .status-control select:focus, .payment-row select:focus, .status-filter:focus { border-color: #9d315f; box-shadow: 0 0 0 3px rgba(157, 49, 95, .16); outline: 0; }
 .insight { background: #421f3c; }
 .notice { box-shadow: inset 0 0 0 1px rgba(157, 49, 95, .04); }
 .auth-shell { background: #341b34; }
