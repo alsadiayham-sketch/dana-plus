@@ -88,6 +88,7 @@ function App() {
   const [authState, setAuthState] = useState(firebaseConfigured ? 'checking' : 'unavailable')
   const [remoteReady, setRemoteReady] = useState(false)
   const [remoteError, setRemoteError] = useState('')
+  const [modal, setModal] = useState('')
   const applyingSnapshot = useRef(false)
 
   useEffect(() => {
@@ -122,7 +123,7 @@ function App() {
       .catch(() => setRemoteError('تعذر حفظ التعديل في Firebase.'))
   }, [authState, data, remoteReady])
 
-  const metrics = useMemo(() => data.sales.reduce((sum, sale) => {
+  const metrics = useMemo(() => data.sales.filter((sale) => sale.status === 'مكتمل').reduce((sum, sale) => {
     const values = saleValues(sale, data.products)
     sum.sales += values.productTotal
     sum.danaProfit += values.danaProfit
@@ -130,14 +131,22 @@ function App() {
     sum.delivery += values.deliveryFee
     return sum
   }, { sales: 0, danaProfit: 0, repProfit: 0, delivery: 0 }), [data])
+  const lastMonthProfit = useMemo(() => {
+    const now = new Date()
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const to = new Date(now.getFullYear(), now.getMonth(), 1)
+    return data.sales.filter((sale) => sale.status === 'مكتمل' && new Date(`${sale.date}T00:00:00`) >= from && new Date(`${sale.date}T00:00:00`) < to).reduce((sum, sale) => sum + saleValues(sale, data.products).danaProfit, 0)
+  }, [data])
 
   const repSummary = useMemo(() => data.representatives.map((representative) => {
-    const values = data.sales.filter((sale) => sale.repId === representative.id).map((sale) => saleValues(sale, data.products))
-    const paid = data.payments.filter((payment) => payment.repId === representative.id).reduce((sum, payment) => sum + Number(payment.amount), 0)
+    const completedSales = data.sales.filter((sale) => sale.repId === representative.id && sale.status === 'مكتمل')
+    const values = completedSales.map((sale) => saleValues(sale, data.products))
+    const paid = data.payments.filter((payment) => payment.repId === representative.id && payment.status === 'مكتمل').reduce((sum, payment) => sum + Number(payment.amount), 0)
     const repProfit = values.reduce((sum, value) => sum + value.repProfit, 0)
     return {
       ...representative,
-      orderCount: values.length,
+      orderCount: completedSales.length,
+      rejectedCount: data.sales.filter((sale) => sale.repId === representative.id && sale.status === 'ملغي').length,
       sales: values.reduce((sum, value) => sum + value.productTotal, 0),
       danaProfit: values.reduce((sum, value) => sum + value.danaProfit, 0),
       repProfit,
@@ -173,10 +182,10 @@ function App() {
     products: current.products.map((product) => product.id === id ? { ...product, [field]: ['purchasePrice', 'representativePrice', 'sellingPrice'].includes(field) ? Number(value) || 0 : value } : product),
   }))
 
-  const addProduct = () => {
+  const addProduct = (product) => {
     const id = `product-${Date.now()}`
-    setData((current) => ({ ...current, products: [{ id, name: 'منتج جديد', brand: 'دانا بلس', category: 'عناية', purchasePrice: 0, representativePrice: 0, sellingPrice: 0 }, ...current.products] }))
-    setNotice('أُضيف منتج جديد. عدّلي التفاصيل والأسعار قبل استخدامه في البيع.')
+    setData((current) => ({ ...current, products: [{ id, ...product }, ...current.products] }))
+    setNotice('أُضيف المنتج إلى الكتالوج.')
   }
 
   const updateDelivery = (id, field, value) => setData((current) => ({
@@ -184,9 +193,9 @@ function App() {
     deliveries: current.deliveries.map((delivery) => delivery.id === id ? { ...delivery, [field]: field === 'fee' ? Number(value) || 0 : value } : delivery),
   }))
 
-  const addRepresentative = () => {
+  const addRepresentative = (representative) => {
     const id = `rep-${Date.now()}`
-    setData((current) => ({ ...current, representatives: [...current.representatives, { id, name: 'مندوبة جديدة', area: 'المنطقة', phone: '' }] }))
+    setData((current) => ({ ...current, representatives: [...current.representatives, { id, ...representative }] }))
   }
 
   const updateRepresentative = (id, field, value) => setData((current) => ({
@@ -195,9 +204,11 @@ function App() {
   }))
 
   const savePayment = (payment) => {
-    setData((current) => ({ ...current, payments: [{ ...payment, id: String(Date.now()) }, ...current.payments] }))
+    setData((current) => ({ ...current, payments: [{ ...payment, status: 'مكتمل', id: String(Date.now()) }, ...current.payments] }))
     setNotice('تم تسجيل الدفعة وتحديث المستحق للمندوبة.')
   }
+  const updatePaymentStatus = (id, status) => setData((current) => ({ ...current, payments: current.payments.map((payment) => payment.id === id ? { ...payment, status } : payment) }))
+  const updateSaleStatus = (id, status) => setData((current) => ({ ...current, sales: current.sales.map((sale) => sale.id === id ? { ...sale, status } : sale) }))
 
   if (authState === 'checking') return <main className="auth-shell" dir="rtl"><div className="auth-card"><span className="brand-mark">د+</span><h1>دانا بلس</h1><p>جارٍ فتح مساحة العمل…</p></div></main>
   if (authState !== 'authenticated') return <LoginScreen unavailable={authState === 'unavailable'} onLogin={async (email, password) => signInWithEmailAndPassword(auth, email, password)} />
@@ -206,6 +217,7 @@ function App() {
     ['dashboard', 'لوحة التحكم'],
     ['sale', 'تسجيل عملية بيع'],
     ['sales', 'المبيعات'],
+    ['cancelled', 'الطلبات الملغاة'],
     ['products', 'المنتجات والأسعار'],
     ['representatives', 'المندوبات'],
     ['payments', 'دفعات المندوبات'],
@@ -229,14 +241,17 @@ function App() {
         {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="إغلاق">×</button></div>}
         {remoteError && <div className="notice error-notice" role="alert">{remoteError}</div>}
 
-        {activePage === 'dashboard' && <Dashboard metrics={metrics} orderCount={data.sales.length} representatives={repSummary} products={topProducts} onRepresentatives={() => setActivePage('representatives')} />}
+        {activePage === 'dashboard' && <Dashboard metrics={metrics} lastMonthProfit={lastMonthProfit} orderCount={data.sales.filter((sale) => sale.status === 'مكتمل').length} representatives={repSummary} products={topProducts} onRepresentatives={() => setActivePage('representatives')} />}
         {activePage === 'sale' && <SaleForm draft={draft} setDraft={setDraft} representatives={data.representatives} products={data.products} deliveries={data.deliveries} onSubmit={saveSale} />}
-        {activePage === 'sales' && <SalesTable sales={data.sales} products={data.products} representatives={data.representatives} deliveries={data.deliveries} />}
-        {activePage === 'products' && <Products products={data.products} onChange={updateProduct} onAdd={addProduct} />}
-        {activePage === 'representatives' && <Representatives summaries={repSummary} onAdd={addRepresentative} onChange={updateRepresentative} />}
-        {activePage === 'payments' && <Payments representatives={repSummary} payments={data.payments} onSave={savePayment} />}
+        {activePage === 'sales' && <SalesTable sales={data.sales} products={data.products} representatives={data.representatives} deliveries={data.deliveries} onStatusChange={updateSaleStatus} />}
+        {activePage === 'cancelled' && <SalesTable sales={data.sales.filter((sale) => sale.status === 'ملغي')} products={data.products} representatives={data.representatives} deliveries={data.deliveries} onStatusChange={updateSaleStatus} title="الطلبات الملغاة" />}
+        {activePage === 'products' && <Products products={data.products} onChange={updateProduct} onAdd={() => setModal('product')} />}
+        {activePage === 'representatives' && <Representatives summaries={repSummary} onAdd={() => setModal('representative')} onChange={updateRepresentative} />}
+        {activePage === 'payments' && <Payments representatives={repSummary} payments={data.payments} onSave={savePayment} onStatusChange={updatePaymentStatus} />}
         {activePage === 'delivery' && <Delivery deliveries={data.deliveries} onChange={updateDelivery} />}
       </main>
+      {modal === 'product' && <ProductModal onClose={() => setModal('')} onSave={(product) => { addProduct(product); setModal('') }} />}
+      {modal === 'representative' && <RepresentativeModal onClose={() => setModal('')} onSave={(representative) => { addRepresentative(representative); setModal('') }} />}
     </div>
   )
 }
@@ -265,8 +280,8 @@ function LoginScreen({ unavailable, onLogin }) {
   return <main className="auth-shell" dir="rtl"><form className="auth-card" onSubmit={submit}><span className="brand-mark">د+</span><p className="eyebrow">مساحة دانا الخاصة</p><h1>تسجيل الدخول</h1><p>{unavailable ? 'إعدادات Firebase غير مكتملة لهذا النشر.' : 'أدخلي بيانات Firebase للوصول إلى حسابات المبيعات.'}</p><label className="field">البريد الإلكتروني<input type="email" value={email} autoComplete="email" onChange={(event) => setEmail(event.target.value)} required /></label><label className="field">كلمة المرور<input type="password" value={password} autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} required /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button" type="submit" disabled={loading}>{loading ? 'جارٍ الدخول…' : 'دخول'}</button></form></main>
 }
 
-function Dashboard({ metrics, orderCount, representatives, products, onRepresentatives }) {
-  return <><section className="metric-grid" aria-label="ملخص المبيعات"><Metric title="إجمالي مبيعات المنتجات" value={currency.format(metrics.sales)} detail={`${orderCount} طلبات مسجلة`} /><Metric title="صافي ربح دانا" value={currency.format(metrics.danaProfit)} detail="من فرق الجملة والتكلفة" accent /><Metric title="أرباح المندوبات" value={currency.format(metrics.repProfit)} detail="من فرق البيع والجملة" /><Metric title="رسوم التوصيل" value={currency.format(metrics.delivery)} detail="تُضاف إلى إجمالي العميلة" /></section><section className="content-grid"><article className="panel"><div className="panel-heading"><div><h2>أداء المندوبات</h2><p>المبيعات والأرباح المحتسبة لكل مندوبة</p></div><button className="text-button" onClick={onRepresentatives}>إدارة المندوبات</button></div><div className="rep-list">{representatives.map((representative) => <div className="rep-row" key={representative.id}><span className="rep-avatar">{representative.name.slice(0, 1)}</span><div className="rep-name"><strong>{representative.name}</strong><span>{representative.area} · {representative.orderCount} طلبات</span></div><div><span className="small-label">مبيعات</span><strong>{currency.format(representative.sales)}</strong></div><div className="profit"><span className="small-label">ربح دانا</span><strong>{currency.format(representative.danaProfit)}</strong></div></div>)}</div></article><article className="panel insight"><p className="eyebrow">الأكثر مبيعًا</p><h2>المنتجات التي تتحرك الآن</h2>{products.length ? <ol className="top-products">{products.map((product) => <li key={product.id}><span>{product.name}</span><strong>{product.quantity} قطع</strong></li>)}</ol> : <p>أول طلب سيظهر أداء المنتجات هنا.</p>}</article></section></>
+function Dashboard({ metrics, lastMonthProfit, orderCount, representatives, products, onRepresentatives }) {
+  return <><section className="metric-grid" aria-label="ملخص المبيعات"><Metric title="إجمالي مبيعات المنتجات" value={currency.format(metrics.sales)} detail={`${orderCount} طلبات مكتملة`} /><Metric title="صافي ربح دانا" value={currency.format(metrics.danaProfit)} detail="من الطلبات المكتملة" accent /><Metric title="ربح الشهر الماضي" value={currency.format(lastMonthProfit)} detail="صافي ربح دانا" /><Metric title="أرباح المندوبات" value={currency.format(metrics.repProfit)} detail="من الطلبات المكتملة" /></section><section className="content-grid"><article className="panel"><div className="panel-heading"><div><h2>أداء المندوبات</h2><p>المبيعات والأرباح المحتسبة لكل مندوبة</p></div><button className="text-button" onClick={onRepresentatives}>إدارة المندوبات</button></div><div className="rep-list">{representatives.map((representative) => <div className="rep-row" key={representative.id}><span className="rep-avatar">{representative.name.slice(0, 1)}</span><div className="rep-name"><strong>{representative.name}</strong><span>{representative.area} · {representative.orderCount} مكتمل</span></div><div><span className="small-label">مبيعات</span><strong>{currency.format(representative.sales)}</strong></div><div className="profit"><span className="small-label">ربح دانا</span><strong>{currency.format(representative.danaProfit)}</strong></div></div>)}</div></article><article className="panel insight"><p className="eyebrow">الأكثر مبيعًا</p><h2>المنتجات التي تتحرك الآن</h2>{products.length ? <ol className="top-products">{products.map((product) => <li key={product.id}><span>{product.name}</span><strong>{product.quantity} قطع</strong></li>)}</ol> : <p>أول طلب سيظهر أداء المنتجات هنا.</p>}</article></section></>
 }
 
 function SaleForm({ draft, setDraft, representatives, products, deliveries, onSubmit }) {
@@ -287,7 +302,7 @@ function ProductPicker({ item, products, onSelect, onChange, onRemove }) {
   const [query, setQuery] = useState('')
   const selected = products.find((product) => product.id === item.productId)
   const matches = products.filter((product) => `${product.name} ${product.brand} ${product.category}`.includes(query.trim()))
-  return <div className="sale-item product-picker"><input aria-label="ابحثي عن منتج" placeholder="ابحثي باسم المنتج…" value={query} onChange={(event) => setQuery(event.target.value)} /><select aria-label="اختيار المنتج" value={item.productId} onChange={(event) => onSelect(event.target.value)}>{matches.map((product) => <option value={product.id} key={product.id}>{product.name} — من {currency.format(product.sellingPrice)}</option>)}</select><input aria-label="الكمية" type="number" min="1" value={item.quantity} onChange={(event) => onChange('quantity', event.target.value)} /><input aria-label="سعر البيع الفعلي" type="number" min={selected?.sellingPrice || 0} value={Math.max(selected?.sellingPrice || 0, Number(item.salePrice) || 0)} onChange={(event) => onChange('salePrice', Number(event.target.value) || selected?.sellingPrice || 0)} /><small>سعر البيع الفعلي · الحد الأدنى {currency.format(selected?.sellingPrice || 0)}</small>{onRemove && <button className="remove-button" type="button" onClick={onRemove}>حذف</button>}</div>
+  return <div className="sale-item product-picker"><div className="product-search"><input aria-label="ابحثي عن منتج" placeholder="ابحثي باسم المنتج…" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <div className="search-results">{matches.slice(0, 6).map((product) => <button type="button" key={product.id} onClick={() => { onSelect(product.id); setQuery('') }}><span>{product.name}</span><small>{currency.format(product.sellingPrice)}</small></button>)}</div>}</div><strong className="selected-product">{selected?.name}</strong><input aria-label="الكمية" type="number" min="1" value={item.quantity} onChange={(event) => onChange('quantity', event.target.value)} /><input aria-label="سعر البيع الفعلي" type="number" min={selected?.sellingPrice || 0} value={Math.max(selected?.sellingPrice || 0, Number(item.salePrice) || 0)} onChange={(event) => onChange('salePrice', Number(event.target.value) || selected?.sellingPrice || 0)} /><small>سعر البيع الفعلي · الحد الأدنى {currency.format(selected?.sellingPrice || 0)}</small>{onRemove && <button className="remove-button" type="button" onClick={onRemove}>حذف</button>}</div>
 }
 
 function Products({ products, onChange, onAdd }) {
@@ -295,10 +310,10 @@ function Products({ products, onChange, onAdd }) {
 }
 
 function Representatives({ summaries, onAdd, onChange }) {
-  return <section className="panel"><div className="panel-heading"><div><h2>حسابات المندوبات</h2><p>تظهر العمولات، الدفعات المسجلة، وما تبقى لكل مندوبة.</p></div><button className="primary-button" onClick={onAdd}>إضافة مندوبة</button></div><div className="representative-cards">{summaries.map((representative) => <article className="representative-card" key={representative.id}><span className="rep-avatar large">{representative.name.slice(0, 1)}</span><input aria-label="اسم المندوبة" value={representative.name} onChange={(event) => onChange(representative.id, 'name', event.target.value)} /><input aria-label="منطقة المندوبة" className="sub-input" value={representative.area} onChange={(event) => onChange(representative.id, 'area', event.target.value)} /><div><span>ربح المندوبة</span><strong>{currency.format(representative.repProfit)}</strong></div><div><span>دُفع لها</span><strong>{currency.format(representative.paid)}</strong></div><div className="highlight"><span>المستحق لها</span><strong>{currency.format(representative.due)}</strong></div><div><span>ربح دانا الثابت</span><strong>{currency.format(representative.danaProfit)}</strong></div></article>)}</div></section>
+  return <section className="panel"><div className="panel-heading"><div><h2>حسابات المندوبات</h2><p>تظهر العمولات، الدفعات المسجلة، وما تبقى لكل مندوبة.</p></div><button className="primary-button" onClick={onAdd}>إضافة مندوبة</button></div><div className="representative-cards">{summaries.map((representative) => <article className="representative-card" key={representative.id}><span className="rep-avatar large">{representative.name.slice(0, 1)}</span><input aria-label="اسم المندوبة" value={representative.name} onChange={(event) => onChange(representative.id, 'name', event.target.value)} /><input aria-label="منطقة المندوبة" className="sub-input" value={representative.area} onChange={(event) => onChange(representative.id, 'area', event.target.value)} /><div><span>مبيعات مكتملة</span><strong>{representative.orderCount}</strong></div><div><span>مبيعات مرفوضة</span><strong>{representative.rejectedCount}</strong></div><div><span>ربح المندوبة</span><strong>{currency.format(representative.repProfit)}</strong></div><div><span>دُفع لها</span><strong>{currency.format(representative.paid)}</strong></div><div className="highlight"><span>المستحق لها</span><strong>{currency.format(representative.due)}</strong></div></article>)}</div></section>
 }
 
-function Payments({ representatives, payments, onSave }) {
+function Payments({ representatives, payments, onSave, onStatusChange }) {
   const [draft, setDraft] = useState(() => ({ repId: representatives[0]?.id || '', amount: '', date: new Date().toISOString().slice(0, 10), notes: '' }))
   const submit = (event) => {
     event.preventDefault()
@@ -306,7 +321,7 @@ function Payments({ representatives, payments, onSave }) {
     onSave({ ...draft, amount: Number(draft.amount) })
     setDraft((current) => ({ ...current, amount: '', notes: '' }))
   }
-  return <section className="payment-layout"><form className="panel payment-form" onSubmit={submit}><div className="panel-heading"><div><h2>تسجيل دفعة للمندوبة</h2><p>سجّلي ما دُفع فعليًا ليظهر الرصيد المتبقي بدقة.</p></div></div><Field label="المندوبة"><select value={draft.repId} onChange={(event) => setDraft({ ...draft, repId: event.target.value })}>{representatives.map((representative) => <option value={representative.id} key={representative.id}>{representative.name} — المستحق {currency.format(representative.due)}</option>)}</select></Field><div className="form-columns"><Field label="المبلغ المدفوع"><input type="number" min="1" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} required /></Field><Field label="تاريخ الدفعة"><input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /></Field></div><Field label="ملاحظة"><input value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="مثال: تحويل بنكي" /></Field><button className="primary-button full-width" type="submit">حفظ الدفعة</button></form><aside className="panel payment-history"><h2>آخر الدفعات</h2>{payments.length ? payments.map((payment) => { const representative = representatives.find((item) => item.id === payment.repId); return <div className="payment-row" key={payment.id}><div><strong>{representative?.name}</strong><small>{payment.date}{payment.notes ? ` · ${payment.notes}` : ''}</small></div><strong>{currency.format(payment.amount)}</strong></div> }) : <p>لا توجد دفعات مسجلة بعد.</p>}</aside></section>
+  return <section className="payment-layout"><form className="panel payment-form" onSubmit={submit}><div className="panel-heading"><div><h2>تسجيل دفعة للمندوبة</h2><p>لا تدخل الدفعة في الرصيد إلا بعد تحويل حالتها إلى مكتمل.</p></div></div><Field label="المندوبة"><select value={draft.repId} onChange={(event) => setDraft({ ...draft, repId: event.target.value })}>{representatives.map((representative) => <option value={representative.id} key={representative.id}>{representative.name} — المستحق {currency.format(representative.due)}</option>)}</select></Field><div className="form-columns"><Field label="المبلغ المدفوع"><input type="number" min="1" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} required /></Field><Field label="تاريخ الدفعة"><input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /></Field></div><Field label="ملاحظة"><input value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="مثال: تحويل بنكي" /></Field><button className="primary-button full-width" type="submit">حفظ الدفعة</button></form><aside className="panel payment-history"><h2>آخر الدفعات</h2>{payments.length ? payments.map((payment) => { const representative = representatives.find((item) => item.id === payment.repId); return <div className="payment-row" key={payment.id}><div><strong>{representative?.name}</strong><small>{payment.date}{payment.notes ? ` · ${payment.notes}` : ''}</small></div><select value={payment.status || 'مكتمل'} onChange={(event) => onStatusChange(payment.id, event.target.value)}><option>مكتمل</option><option>معلق</option><option>ملغي</option></select><strong>{currency.format(payment.amount)}</strong></div> }) : <p>لا توجد دفعات مسجلة بعد.</p>}</aside></section>
 }
 
 function Delivery({ deliveries, onChange }) {
@@ -317,8 +332,24 @@ function SalePreview({ values }) {
   return <aside className="panel sale-preview"><p className="eyebrow">المعاينة المالية</p><h2>ملخص هذا الطلب</h2><div className="calculation"><span>منتجات للعميلة</span><strong>{currency.format(values.productTotal)}</strong></div><div className="calculation"><span>رسوم التوصيل</span><strong>{currency.format(values.deliveryFee)}</strong></div><div className="calculation"><span>المبلغ المطلوب</span><strong>{currency.format(values.total)}</strong></div><div className="calculation"><span>ربح المندوبة</span><strong>{currency.format(values.repProfit)}</strong></div><div className="calculation total"><span>ربح دانا</span><strong>{currency.format(values.danaProfit)}</strong></div><p className="helper-text">تكلفة المنتجات: {currency.format(values.cost)}</p></aside>
 }
 
-function SalesTable({ sales, products, representatives, deliveries }) {
-  return <section className="panel table-panel"><div className="panel-heading"><div><h2>كل المبيعات</h2><p>{sales.length} عمليات مسجلة</p></div></div><div className="sales-table"><div className="sales-head"><span>التاريخ</span><span>العميلة / المندوبة</span><span>المنتجات</span><span>التسليم</span><span>إجمالي العميلة</span><span>ربح دانا</span></div>{sales.map((sale) => { const value = saleValues(sale, products); const representative = representatives.find((item) => item.id === sale.repId); const delivery = deliveries.find((item) => item.id === sale.delivery); return <div className="sales-row" key={sale.id}><span>{sale.date}</span><span><strong>{sale.customerName}</strong><small>{representative?.name}</small></span><span>{(sale.items || []).map((item) => `${products.find((product) => product.id === item.productId)?.name || 'منتج'} × ${item.quantity}`).join('، ')}</span><span>{delivery?.label || 'توصيل'}</span><strong>{currency.format(value.total)}</strong><strong className="profit">{currency.format(value.danaProfit)}</strong></div> })}</div></section>
+function SalesTable({ sales, products, representatives, onStatusChange, title = 'كل المبيعات' }) {
+  const [filter, setFilter] = useState('الكل')
+  const shown = filter === 'الكل' ? sales : sales.filter((sale) => sale.status === filter)
+  return <section className="panel table-panel"><div className="panel-heading"><div><h2>{title}</h2><p>{shown.length} عمليات ظاهرة</p></div><select className="status-filter" value={filter} onChange={(event) => setFilter(event.target.value)}><option>الكل</option><option>جديد</option><option>قيد التجهيز</option><option>مكتمل</option><option>ملغي</option></select></div><div className="sales-table"><div className="sales-head"><span>التاريخ</span><span>العميلة / المندوبة</span><span>المنتجات</span><span>الحالة</span><span>إجمالي العميلة</span><span>ربح دانا</span></div>{shown.map((sale) => { const value = saleValues(sale, products); const representative = representatives.find((item) => item.id === sale.repId); return <div className="sales-row" key={sale.id}><span>{sale.date}</span><span><strong>{sale.customerName}</strong><small>{representative?.name}</small></span><span>{(sale.items || []).map((item) => `${products.find((product) => product.id === item.productId)?.name || 'منتج'} × ${item.quantity}`).join('، ')}</span><select value={sale.status} onChange={(event) => onStatusChange(sale.id, event.target.value)}><option>جديد</option><option>قيد التجهيز</option><option>مكتمل</option><option>ملغي</option></select><strong>{currency.format(value.total)}</strong><strong className="profit">{sale.status === 'مكتمل' ? currency.format(value.danaProfit) : '—'}</strong></div> })}</div></section>
+}
+
+function ProductModal({ onClose, onSave }) {
+  const [product, setProduct] = useState({ name: '', brand: 'دانا بلس', category: 'عناية', purchasePrice: '', representativePrice: '', sellingPrice: '' })
+  return <Modal title="إضافة منتج" onClose={onClose}><form className="modal-form" onSubmit={(event) => { event.preventDefault(); onSave({ ...product, purchasePrice: Number(product.purchasePrice), representativePrice: Number(product.representativePrice), sellingPrice: Number(product.sellingPrice) }) }}><Field label="اسم المنتج"><input required value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} /></Field><Field label="التصنيف"><input value={product.category} onChange={(event) => setProduct({ ...product, category: event.target.value })} /></Field><div className="form-columns">{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <Field label={field === 'purchasePrice' ? 'سعر التكلفة' : field === 'representativePrice' ? 'سعر المندوبة' : 'أقل سعر للعميلة'} key={field}><input required type="number" min="0" value={product[field]} onChange={(event) => setProduct({ ...product, [field]: event.target.value })} /></Field>)}</div><button className="primary-button">حفظ المنتج</button></form></Modal>
+}
+
+function RepresentativeModal({ onClose, onSave }) {
+  const [representative, setRepresentative] = useState({ name: '', area: '', phone: '' })
+  return <Modal title="إضافة مندوبة" onClose={onClose}><form className="modal-form" onSubmit={(event) => { event.preventDefault(); onSave(representative) }}><Field label="الاسم"><input required value={representative.name} onChange={(event) => setRepresentative({ ...representative, name: event.target.value })} /></Field><Field label="المنطقة"><input required value={representative.area} onChange={(event) => setRepresentative({ ...representative, area: event.target.value })} /></Field><Field label="رقم الهاتف"><input value={representative.phone} onChange={(event) => setRepresentative({ ...representative, phone: event.target.value })} /></Field><button className="primary-button">حفظ المندوبة</button></form></Modal>
+}
+
+function Modal({ title, children, onClose }) {
+  return <div className="modal-backdrop" role="presentation"><section className="modal" role="dialog" aria-modal="true" aria-label={title}><div className="panel-heading"><h2>{title}</h2><button className="text-button" onClick={onClose}>إغلاق</button></div>{children}</section></div>
 }
 
 function Metric({ title, value, detail, accent = false }) {
