@@ -199,8 +199,9 @@ function App() {
     ...current,
     deliveries: current.deliveries.map((delivery) => delivery.id === id ? { ...delivery, [field]: field === 'fee' ? Number(value) || 0 : value } : delivery),
   }))
-  const addPickupLocation = () => setData((current) => ({ ...current, pickupLocations: [...current.pickupLocations, { id: `pickup-${Date.now()}`, name: 'نقطة استلام جديدة' }] }))
+  const addPickupLocation = (name) => setData((current) => ({ ...current, pickupLocations: [...current.pickupLocations, { id: `pickup-${Date.now()}`, name }] }))
   const updatePickupLocation = (id, name) => setData((current) => ({ ...current, pickupLocations: current.pickupLocations.map((location) => location.id === id ? { ...location, name } : location) }))
+  const removePickupLocation = (id) => setData((current) => ({ ...current, pickupLocations: current.pickupLocations.filter((location) => location.id !== id) }))
 
   const addRepresentative = (representative) => {
     const id = `rep-${Date.now()}`
@@ -253,16 +254,17 @@ function App() {
 
         {activePage === 'dashboard' && <Dashboard metrics={metrics} lastMonthProfit={lastMonthProfit} orderCount={data.sales.filter((sale) => sale.status === 'مكتمل').length} representatives={repSummary} products={topProducts} onRepresentatives={() => setActivePage('representatives')} />}
         {activePage === 'sale' && <SaleForm draft={draft} setDraft={setDraft} representatives={data.representatives} products={data.products} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onSubmit={saveSale} />}
-        {activePage === 'sales' && <SalesTable sales={data.sales} products={data.products} representatives={data.representatives} deliveries={data.deliveries} onStatusChange={updateSaleStatus} />}
-        {activePage === 'cancelled' && <SalesTable sales={data.sales.filter((sale) => sale.status === 'ملغي')} products={data.products} representatives={data.representatives} deliveries={data.deliveries} onStatusChange={updateSaleStatus} title="الطلبات الملغاة" />}
+        {activePage === 'sales' && <SalesTable sales={data.sales} products={data.products} representatives={data.representatives} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onStatusChange={updateSaleStatus} />}
+        {activePage === 'cancelled' && <SalesTable sales={data.sales.filter((sale) => sale.status === 'ملغي')} products={data.products} representatives={data.representatives} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onStatusChange={updateSaleStatus} title="الطلبات الملغاة" />}
         {activePage === 'products' && <Products products={data.products} onChange={updateProduct} onRemove={removeProduct} onAdd={() => setModal('product')} />}
         {activePage === 'representatives' && <Representatives summaries={repSummary} onAdd={() => setModal('representative')} onChange={updateRepresentative} />}
         {activePage === 'payments' && <Payments representatives={repSummary} payments={data.payments} onSave={savePayment} onStatusChange={updatePaymentStatus} />}
-        {activePage === 'pickup-locations' && <PickupLocations locations={data.pickupLocations} onAdd={addPickupLocation} onChange={updatePickupLocation} />}
+        {activePage === 'pickup-locations' && <PickupLocations locations={data.pickupLocations} onAdd={() => setModal('pickup')} onChange={updatePickupLocation} onRemove={removePickupLocation} />}
         {activePage === 'delivery' && <Delivery deliveries={data.deliveries} onChange={updateDelivery} />}
       </main>
       {modal === 'product' && <ProductModal onClose={() => setModal('')} onSave={(product) => { addProduct(product); setModal('') }} />}
       {modal === 'representative' && <RepresentativeModal onClose={() => setModal('')} onSave={(representative) => { addRepresentative(representative); setModal('') }} />}
+      {modal === 'pickup' && <PickupLocationModal onClose={() => setModal('')} onSave={(name) => { addPickupLocation(name); setModal('') }} />}
       {confirmation && <OrderConfirmation sale={confirmation} products={data.products} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onClose={() => { setConfirmation(null); setActivePage('sales') }} />}
     </div>
   )
@@ -325,7 +327,9 @@ function Products({ products, onChange, onRemove, onAdd }) {
 }
 
 function Representatives({ summaries, onAdd, onChange }) {
-  return <section className="panel"><div className="panel-heading"><div><h2>حسابات المندوبات</h2><p>تظهر العمولات، الدفعات المسجلة، وما تبقى لكل مندوبة.</p></div><button className="primary-button" onClick={onAdd}>إضافة مندوبة</button></div><div className="representative-cards">{summaries.map((representative) => <article className="representative-card" key={representative.id}><span className="rep-avatar large">{representative.name.slice(0, 1)}</span><input aria-label="اسم المندوبة" value={representative.name} onChange={(event) => onChange(representative.id, 'name', event.target.value)} /><input aria-label="منطقة المندوبة" className="sub-input" value={representative.area} onChange={(event) => onChange(representative.id, 'area', event.target.value)} /><div><span>مبيعات مكتملة</span><strong>{representative.orderCount}</strong></div><div><span>مبيعات مرفوضة</span><strong>{representative.rejectedCount}</strong></div><div><span>ربح المندوبة</span><strong>{currency.format(representative.repProfit)}</strong></div><div><span>دُفع لها</span><strong>{currency.format(representative.paid)}</strong></div><div className="highlight"><span>المستحق لها</span><strong>{currency.format(representative.due)}</strong></div></article>)}</div></section>
+  const [query, setQuery] = useState('')
+  const shown = summaries.filter((rep) => `${rep.name} ${rep.area}`.includes(query))
+  return <section className="panel"><div className="panel-heading"><div><h2>حسابات المندوبات</h2><p>تظهر العمولات، الدفعات المسجلة، وما تبقى لكل مندوبة.</p></div><button className="primary-button" onClick={onAdd}>إضافة مندوبة</button>  </div><input className="rep-search" placeholder="ابحثي عن مندوبة…" value={query} onChange={(event) => setQuery(event.target.value)} /><div className="representative-cards">{shown.map((representative) => <article className="representative-card" key={representative.id}><span className="rep-avatar large">{representative.name.slice(0, 1)}</span><input aria-label="اسم المندوبة" value={representative.name} onChange={(event) => onChange(representative.id, 'name', event.target.value)} /><input aria-label="منطقة المندوبة" className="sub-input" value={representative.area} onChange={(event) => onChange(representative.id, 'area', event.target.value)} /><div><span>مبيعات مكتملة</span><strong>{representative.orderCount}</strong></div><div><span>مبيعات مرفوضة</span><strong>{representative.rejectedCount}</strong></div><div><span>ربح المندوبة</span><strong>{currency.format(representative.repProfit)}</strong></div><div><span>دُفع لها</span><strong>{currency.format(representative.paid)}</strong></div><div className="highlight"><span>المستحق لها</span><strong>{currency.format(representative.due)}</strong></div></article>)}</div></section>
 }
 
 function Payments({ representatives, payments, onSave, onStatusChange }) {
@@ -343,9 +347,14 @@ function Delivery({ deliveries, onChange }) {
   return <section className="panel delivery-panel"><div className="panel-heading"><div><h2>رسوم التوصيل</h2><p>تُضاف تلقائيًا عند اختيار المنطقة، ويمكن تعديلها داخل الطلب.</p></div></div>{deliveries.map((delivery) => <label className="delivery-row" key={delivery.id}><span><strong>{delivery.label}</strong><small>تسعيرة افتراضية للطلبات الجديدة</small></span><input type="number" min="0" value={delivery.fee} onChange={(event) => onChange(delivery.id, 'fee', event.target.value)} /><b>₪</b></label>)}</section>
 }
 
-function PickupLocations({ locations, onAdd, onChange }) {
-  return <section className="panel delivery-panel"><div className="panel-heading"><div><h2>نقاط الاستلام</h2><p>تظهر هذه القائمة عند اختيار الاستلام من نقطة البيع.</p></div><button className="primary-button" onClick={onAdd}>إضافة نقطة</button></div>{locations.map((location) => <label className="delivery-row" key={location.id}><span><strong>نقطة استلام</strong><small>اسم يظهر للمندوبة والعميلة</small></span><input value={location.name} onChange={(event) => onChange(location.id, event.target.value)} /></label>)}</section>
+function PickupLocations({ locations, onAdd, onChange, onRemove }) {
+  return <section className="panel delivery-panel"><div className="panel-heading"><div><h2>نقاط الاستلام</h2><p>تظهر هذه القائمة عند اختيار الاستلام من نقطة البيع.</p></div><button className="primary-button" onClick={onAdd}>إضافة نقطة</button></div>{locations.map((location) => <label className="delivery-row" key={location.id}><span><strong>نقطة استلام</strong><small>اسم يظهر للمندوبة والعميلة  </small></span><input value={location.name} onChange={(event) => onChange(location.id, event.target.value)} /><button className="remove-button" onClick={() => onRemove(location.id)}>حذف</button></label>)}</section>
 }
+
+  function PickupLocationModal({ onClose, onSave }) {
+    const [name, setName] = useState('')
+    return <Modal title="إضافة نقطة استلام" onClose={onClose}><form className="modal-form" onSubmit={(event) => { event.preventDefault(); onSave(name) }}><Field label="اسم النقطة"><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></Field><button className="primary-button">حفظ النقطة</button></form></Modal>
+  }
 
 function SalePreview({ values }) {
   return <aside className="panel sale-preview"><p className="eyebrow">المعاينة المالية</p><h2>ملخص هذا الطلب</h2><div className="calculation"><span>منتجات للعميلة</span><strong>{currency.format(values.productTotal)}</strong></div><div className="calculation"><span>رسوم التوصيل</span><strong>{currency.format(values.deliveryFee)}</strong></div><div className="calculation"><span>المبلغ المطلوب</span><strong>{currency.format(values.total)}</strong></div><div className="calculation"><span>ربح المندوبة</span><strong>{currency.format(values.repProfit)}</strong></div><div className="calculation total"><span>ربح دانا</span><strong>{currency.format(values.danaProfit)}</strong></div><p className="helper-text">تكلفة المنتجات: {currency.format(values.cost)}</p></aside>
