@@ -226,3 +226,51 @@ h2 { font-weight: 700; }
   .topbar { padding-bottom: 16px; }
   .sidebar { box-shadow: 0 2px 6px rgba(52, 27, 52, .16); }
 }
+
+/* Compact operational density while preserving accessible control targets. */
+.sidebar { padding: 20px 14px 14px; }
+.brand { padding-bottom: 20px; }
+main { padding-top: 28px; padding-bottom: 48px; }
+.topbar { margin-bottom: 20px; padding-bottom: 14px; }
+.topbar-actions { gap: 10px; }
+.metric-grid { gap: 10px; margin-bottom: 16px; }
+.metric-card { min-height: 100px; gap: 5px; padding: 14px; }
+.attention-queue { margin-bottom: 16px; padding: 16px 18px 4px; }
+.queue-list { margin-top: 10px; }
+.queue-row { gap: 12px; padding: 9px 0; }
+.content-grid, .sale-layout, .payment-layout { gap: 16px; }
+.panel { padding: 18px; }
+.rep-list { margin-top: 14px; }
+.rep-row { gap: 12px; padding: 10px 0; }
+.top-products { margin-top: 14px; }
+.top-products li { padding: 8px 0; }
+.sale-form, .payment-form { gap: 14px; }
+.form-columns { gap: 12px; }
+.field { gap: 5px; }
+.field input, .field select, .product-table-row input, .representative-card input, .delivery-row input, .sale-item input, .sale-item select, .rep-search { min-height: 44px; }
+.line-items { gap: 8px; padding: 12px 0; }
+.sales-table, .product-table { margin-top: 14px; }
+.sales-head, .sales-row { padding: 9px 8px; }
+.product-table-head, .product-table-row { padding: 8px; }
+.product-table-row input { min-height: 44px; }
+.rep-search { margin-top: 14px; }
+.representative-cards { gap: 12px; margin-top: 16px; }
+.representative-card { padding: 16px; }
+.rep-avatar.large { margin-bottom: 10px; }
+.representative-card .computed-value { margin-top: 9px; padding-top: 9px; }
+.payment-history > p { margin-top: 14px; }
+.payment-row { gap: 12px; padding: 10px 0; }
+.delivery-row { padding: 11px 0; }
+.notice { margin-bottom: 16px; padding: 9px 12px; }
+.modal { padding: 20px; }
+.modal-form { gap: 12px; margin-top: 16px; }
+
+@media (max-width: 760px) {
+  main { padding: 18px 14px 36px; }
+  .topbar { gap: 12px; margin-bottom: 16px; padding-bottom: 12px; }
+  .metric-grid, .form-columns { gap: 8px; }
+  .metric-card { min-height: 0; padding: 13px; }
+  .panel, .attention-queue { padding: 14px; }
+  .sales-row > * { padding: 9px; }
+  .modal { padding: 16px; }
+}
