@@ -12,6 +12,8 @@ nav { display: grid; gap: 5px; }
 .admin-avatar, .rep-avatar { display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: #d4f3ed; color: #0c5d58; width: 35px; height: 35px; font-weight: 700; }
 main { padding: 32px clamp(20px, 4vw, 60px) 60px; max-width: 1600px; width: 100%; overflow: hidden; }
 .topbar, .panel-heading, .line-items-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.topbar-actions { display: flex; align-items: center; gap: 14px; }
+.logout-button { padding: 12px 4px; }
 .topbar { margin-bottom: 30px; }
 .eyebrow { margin: 0 0 5px; color: #64748b; font-size: 13px; }
 h1, h2, p { margin-top: 0; }
@@ -85,6 +87,14 @@ h2 { font-size: 18px; margin-bottom: 4px; text-wrap: balance; }
 .delivery-row b { color: #0b7069; }
 .notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -12px 0 20px; padding: 11px 14px; background: #edfaf7; border: 1px solid #abded5; border-radius: 8px; color: #07534e; font-size: 13px; }
 .notice button { border: 0; background: none; color: inherit; font-size: 22px; line-height: 1; }
+.error-notice { color: #942d27; background: #fff2f0; border-color: #f1b8b1; }
+.auth-shell { min-height: 100vh; display: grid; place-items: center; background: #18253b; padding: 24px; max-width: none; }
+.auth-card { width: min(100%, 410px); display: grid; gap: 16px; background: #fff; padding: 32px; border-radius: 12px; }
+.auth-card .brand-mark { margin-bottom: 4px; }
+.auth-card h1 { font-size: 27px; }
+.auth-card p:not(.eyebrow) { color: #5c6b80; line-height: 1.7; margin-bottom: 0; }
+.auth-card .primary-button:disabled { background: #5b7d79; cursor: wait; }
+.form-error { color: #a23e36 !important; font-size: 13px; }
 @media (max-width: 1050px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .content-grid, .sale-layout, .payment-layout { grid-template-columns: 1fr; } .representative-cards { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 700px) { .app-shell { display: block; } .sidebar { min-height: auto; padding: 14px; position: sticky; top: 0; z-index: 2; } .brand { padding-bottom: 12px; }.sidebar nav { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; }.nav-item { padding: 9px 11px; }.sidebar-footer { display: none; } main { padding: 24px 16px 45px; }.topbar { align-items: stretch; flex-direction: column; }.topbar .primary-button { width: 100%; }.metric-grid, .form-columns { grid-template-columns: 1fr; gap: 10px; }.metric-card { padding: 15px; }.metric-card strong { font-size: 18px; }.panel { padding: 17px; }.rep-row { grid-template-columns: 36px minmax(100px, 1fr) 1fr; }.rep-row > :last-child { display: none; }.representative-cards { grid-template-columns: 1fr; }.sale-item, .product-picker { grid-template-columns: 1fr 76px; }.product-picker small { grid-column: 1 / -1; }.product-picker .remove-button { grid-column: 1 / -1; }.delivery-row { grid-template-columns: 1fr 100px auto; } }
+@media (max-width: 700px) { .app-shell { display: block; } .sidebar { min-height: auto; padding: 14px; position: sticky; top: 0; z-index: 2; } .brand { padding-bottom: 12px; }.sidebar nav { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; }.nav-item { padding: 9px 11px; }.sidebar-footer { display: none; } main { padding: 24px 16px 45px; }.topbar { align-items: stretch; flex-direction: column; }.topbar-actions { flex-direction: column-reverse; align-items: stretch; }.topbar .primary-button { width: 100%; }.metric-grid, .form-columns { grid-template-columns: 1fr; gap: 10px; }.metric-card { padding: 15px; }.metric-card strong { font-size: 18px; }.panel { padding: 17px; }.rep-row { grid-template-columns: 36px minmax(100px, 1fr) 1fr; }.rep-row > :last-child { display: none; }.representative-cards { grid-template-columns: 1fr; }.sale-item, .product-picker { grid-template-columns: 1fr 76px; }.product-picker small { grid-column: 1 / -1; }.product-picker .remove-button { grid-column: 1 / -1; }.delivery-row { grid-template-columns: 1fr 100px auto; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }

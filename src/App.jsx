@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import catalogSeed from './catalog-seed.json'
+import { auth, db, firebaseConfigured } from './firebase'
 import './App.css'
 
 const STORAGE_KEY = 'dana-plus-data-v1'
@@ -48,6 +51,17 @@ function loadData() {
   }
 }
 
+function normalizeData(data) {
+  const defaults = createData()
+  return {
+    products: (data.products || defaults.products).map(({ stock: _stock, ...product }) => product),
+    representatives: data.representatives || defaults.representatives,
+    deliveries: data.deliveries || defaults.deliveries,
+    sales: data.sales || defaults.sales,
+    payments: data.payments || [],
+  }
+}
+
 function saleValues(sale, products) {
   const items = sale.items || [{ productId: sale.productId, quantity: sale.quantity }]
   const result = items.reduce((sum, item) => {
@@ -71,10 +85,42 @@ function App() {
   const [data, setData] = useState(loadData)
   const [notice, setNotice] = useState('')
   const [draft, setDraft] = useState(() => newSaleDraft())
+  const [authState, setAuthState] = useState(firebaseConfigured ? 'checking' : 'unavailable')
+  const [remoteReady, setRemoteReady] = useState(false)
+  const [remoteError, setRemoteError] = useState('')
+  const applyingSnapshot = useRef(false)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   }, [data])
+
+  useEffect(() => {
+    if (!auth) return undefined
+    return onAuthStateChanged(auth, (user) => setAuthState(user ? 'authenticated' : 'unauthenticated'))
+  }, [])
+
+  useEffect(() => {
+    if (authState !== 'authenticated' || !db) return undefined
+    const project = doc(db, 'projects', 'dana-plus')
+    return onSnapshot(project, (snapshot) => {
+      if (snapshot.exists()) {
+        applyingSnapshot.current = true
+        setData(normalizeData(snapshot.data()))
+      }
+      setRemoteReady(true)
+      setRemoteError('')
+    }, () => setRemoteError('تعذر الاتصال ببيانات Firebase. تأكدي من قواعد Firestore ثم أعيدي المحاولة.'))
+  }, [authState])
+
+  useEffect(() => {
+    if (authState !== 'authenticated' || !remoteReady || !db) return
+    if (applyingSnapshot.current) {
+      applyingSnapshot.current = false
+      return
+    }
+    setDoc(doc(db, 'projects', 'dana-plus'), { ...data, updatedAt: serverTimestamp() }, { merge: true })
+      .catch(() => setRemoteError('تعذر حفظ التعديل في Firebase.'))
+  }, [authState, data, remoteReady])
 
   const metrics = useMemo(() => data.sales.reduce((sum, sale) => {
     const values = saleValues(sale, data.products)
@@ -153,6 +199,9 @@ function App() {
     setNotice('تم تسجيل الدفعة وتحديث المستحق للمندوبة.')
   }
 
+  if (authState === 'checking') return <main className="auth-shell" dir="rtl"><div className="auth-card"><span className="brand-mark">د+</span><h1>دانا بلس</h1><p>جارٍ فتح مساحة العمل…</p></div></main>
+  if (authState !== 'authenticated') return <LoginScreen unavailable={authState === 'unavailable'} onLogin={async (email, password) => signInWithEmailAndPassword(auth, email, password)} />
+
   const navItems = [
     ['dashboard', 'لوحة التحكم'],
     ['sale', 'تسجيل عملية بيع'],
@@ -175,9 +224,10 @@ function App() {
       <main>
         <header className="topbar">
           <div><p className="eyebrow">حساباتك محفوظة على هذا الجهاز</p><h1>{navItems.find(([id]) => id === activePage)?.[1]}</h1></div>
-          <button className="primary-button" onClick={() => setActivePage('sale')}>تسجيل بيع جديد</button>
+          <div className="topbar-actions"><button className="text-button logout-button" onClick={() => signOut(auth)}>تسجيل الخروج</button><button className="primary-button" onClick={() => setActivePage('sale')}>تسجيل بيع جديد</button></div>
         </header>
         {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="إغلاق">×</button></div>}
+        {remoteError && <div className="notice error-notice" role="alert">{remoteError}</div>}
 
         {activePage === 'dashboard' && <Dashboard metrics={metrics} orderCount={data.sales.length} representatives={repSummary} products={topProducts} onRepresentatives={() => setActivePage('representatives')} />}
         {activePage === 'sale' && <SaleForm draft={draft} setDraft={setDraft} representatives={data.representatives} products={data.products} deliveries={data.deliveries} onSubmit={saveSale} />}
@@ -193,6 +243,26 @@ function App() {
 
 function newSaleDraft() {
   return { repId: 'r1', items: [{ productId: 'dana-1', quantity: 1, salePrice: catalogSeed[0].sellingPrice }], delivery: 'pickup', deliveryFee: 0, customerName: '', status: 'جديد', date: new Date().toISOString().slice(0, 10), notes: '' }
+}
+
+function LoginScreen({ unavailable, onLogin }) {
+  const [email, setEmail] = useState('dana@mail.com')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const submit = async (event) => {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      await onLogin(email, password)
+    } catch {
+      setError('تعذر تسجيل الدخول. تأكدي من البريد وكلمة المرور.')
+    } finally {
+      setLoading(false)
+    }
+  }
+  return <main className="auth-shell" dir="rtl"><form className="auth-card" onSubmit={submit}><span className="brand-mark">د+</span><p className="eyebrow">مساحة دانا الخاصة</p><h1>تسجيل الدخول</h1><p>{unavailable ? 'إعدادات Firebase غير مكتملة لهذا النشر.' : 'أدخلي بيانات Firebase للوصول إلى حسابات المبيعات.'}</p><label className="field">البريد الإلكتروني<input type="email" value={email} autoComplete="email" onChange={(event) => setEmail(event.target.value)} required /></label><label className="field">كلمة المرور<input type="password" value={password} autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} required /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button" type="submit" disabled={loading}>{loading ? 'جارٍ الدخول…' : 'دخول'}</button></form></main>
 }
 
 function Dashboard({ metrics, orderCount, representatives, products, onRepresentatives }) {
