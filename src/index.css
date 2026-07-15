@@ -1,8 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
 
-:root { font-family: 'Noto Sans Arabic', Arial, sans-serif; color: #0f172a; background: #f8fafc; font-synthesis: none; }
+:root {
+  font-family: 'Noto Sans Arabic', Arial, sans-serif;
+  color: #2a182a;
+  background: #fbf8fa;
+  font-synthesis: none;
+  direction: rtl;
+}
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: #fbf8fa; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(5, 150, 105, .35); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(157, 49, 95, .42); outline-offset: 2px; }
