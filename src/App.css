@@ -248,7 +248,10 @@ main { padding-top: 28px; padding-bottom: 48px; }
 .form-columns { gap: 12px; }
 .field { gap: 5px; }
 .field input, .field select, .product-table-row input, .representative-card input, .delivery-row input, .sale-item input, .sale-item select, .rep-search { min-height: 44px; }
-.line-items { gap: 8px; padding: 12px 0; }
+.line-items { gap: 0; padding: 12px 0; }
+.line-items-heading { margin-bottom: 4px; }
+.product-picker { padding: 8px 0; }
+.product-picker + .product-picker { border-top: 1px solid #eee2e9; }
 .sales-table, .product-table { margin-top: 14px; }
 .sales-head, .sales-row { padding: 9px 8px; }
 .product-table-head, .product-table-row { padding: 8px; }

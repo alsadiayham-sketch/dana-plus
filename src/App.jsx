@@ -73,7 +73,7 @@ function saleValues(sale, products) {
     const product = products.find((candidate) => candidate.id === item.productId)
     if (!product) return sum
     const quantity = Number(item.quantity) || 0
-    const salePrice = Math.max(product.sellingPrice, Number(item.salePrice) || product.sellingPrice)
+    const salePrice = normalizedSalePrice(product, item.salePrice)
     sum.productTotal += salePrice * quantity
     sum.cost += product.purchasePrice * quantity
     sum.danaProfit += (product.representativePrice - product.purchasePrice) * quantity
@@ -83,6 +83,12 @@ function saleValues(sale, products) {
   }, { productTotal: 0, cost: 0, danaProfit: 0, repProfit: 0, itemCount: 0 })
   const deliveryFee = Number(sale.deliveryFee) || 0
   return { ...result, deliveryFee, total: result.productTotal + deliveryFee }
+}
+
+function normalizedSalePrice(product, value) {
+  const wholesalePrice = Number(product?.representativePrice) || 0
+  const suggestedPrice = Number(product?.sellingPrice) || wholesalePrice
+  return Math.max(wholesalePrice, Number(value) || suggestedPrice)
 }
 
 function App() {
@@ -171,7 +177,7 @@ function App() {
     event.preventDefault()
     const cleanItems = draft.items.filter((item) => item.productId && Number(item.quantity) > 0).map((item) => {
       const product = data.products.find((candidate) => candidate.id === item.productId)
-      return { ...item, salePrice: Math.max(product?.sellingPrice || 0, Number(item.salePrice) || product?.sellingPrice || 0) }
+      return { ...item, salePrice: normalizedSalePrice(product, item.salePrice) }
     })
     if (!draft.customerName.trim() || !cleanItems.length) {
       setNotice('أضيفي اسم العميلة ومنتجًا واحدًا على الأقل.')
@@ -185,7 +191,14 @@ function App() {
 
   const updateProduct = (id, field, value) => setData((current) => ({
     ...current,
-    products: current.products.map((product) => product.id === id ? { ...product, [field]: ['purchasePrice', 'representativePrice', 'sellingPrice'].includes(field) ? Number(value) || 0 : value } : product),
+    products: current.products.map((product) => {
+      if (product.id !== id) return product
+      const nextValue = ['purchasePrice', 'representativePrice', 'sellingPrice'].includes(field) ? Number(value) || 0 : value
+      const updated = { ...product, [field]: nextValue }
+      if (field === 'representativePrice') updated.sellingPrice = Math.max(Number(product.sellingPrice) || 0, nextValue)
+      if (field === 'sellingPrice') updated.sellingPrice = Math.max(Number(product.representativePrice) || 0, nextValue)
+      return updated
+    }),
   }))
 
   const addProduct = (product) => {
@@ -271,7 +284,7 @@ function App() {
 }
 
 function newSaleDraft() {
-  return { repId: 'r1', items: [{ productId: 'dana-1', quantity: 1, salePrice: catalogSeed[0].sellingPrice }], delivery: 'pickup', pickupLocation: 'pickup-1', deliveryAddress: '', deliveryFee: 0, customerName: '', status: 'جديد', date: new Date().toISOString().slice(0, 10), notes: '' }
+  return { repId: 'r1', items: [{ productId: '', quantity: 1, salePrice: '' }], delivery: 'pickup', pickupLocation: 'pickup-1', deliveryAddress: '', deliveryFee: 0, customerName: '', status: 'جديد', date: new Date().toISOString().slice(0, 10), notes: '' }
 }
 
 function LoginScreen({ unavailable, onLogin }) {
@@ -304,7 +317,7 @@ function SaleForm({ draft, setDraft, representatives, products, deliveries, pick
   const updateItem = (index, field, value) => setDraft((current) => ({ ...current, items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: field === 'quantity' ? Number(value) || 1 : value } : item) }))
   const selectProduct = (index, productId) => {
     const product = products.find((item) => item.id === productId)
-    setDraft((current) => ({ ...current, items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, productId, salePrice: product?.sellingPrice || 0 } : item) }))
+    setDraft((current) => ({ ...current, items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, productId, salePrice: normalizedSalePrice(product) } : item) }))
   }
   const selectDelivery = (id) => {
     const delivery = deliveries.find((item) => item.id === id)
@@ -313,18 +326,19 @@ function SaleForm({ draft, setDraft, representatives, products, deliveries, pick
   const fulfilmentField = draft.delivery === 'pickup'
     ? <Field label="نقطة الاستلام"><select value={draft.pickupLocation} onChange={(event) => setDraft({ ...draft, pickupLocation: event.target.value })}>{pickupLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></Field>
     : <Field label="عنوان أو موقع التوصيل"><input required value={draft.deliveryAddress} onChange={(event) => setDraft({ ...draft, deliveryAddress: event.target.value })} placeholder="اكتبي موقع التسليم" /></Field>
-  return <section className="sale-layout"><form className="panel sale-form" onSubmit={onSubmit}><div className="panel-heading"><div><h2>تفاصيل الطلب</h2><p>سعر البيع الفعلي لا ينقص عن سعر العميل، وربح دانا يبقى ثابتًا.</p></div></div><div className="form-columns"><Field label="اسم العميلة"><input value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} required /></Field><Field label="المندوبة"><select value={draft.repId} onChange={(event) => setDraft({ ...draft, repId: event.target.value })}>{representatives.map((representative) => <option value={representative.id} key={representative.id}>{representative.name} — {representative.area}</option>)}</select></Field></div><div className="line-items"><div className="line-items-heading"><strong>المنتجات</strong><button className="text-button" type="button" onClick={() => setDraft({ ...draft, items: [...draft.items, { productId: products[0]?.id || '', quantity: 1, salePrice: products[0]?.sellingPrice || 0 }] })}>+ إضافة منتج</button></div>{draft.items.map((item, index) => <ProductPicker item={item} products={products} key={index} onSelect={(productId) => selectProduct(index, productId)} onChange={(field, value) => updateItem(index, field, value)} onRemove={draft.items.length > 1 ? () => setDraft({ ...draft, items: draft.items.filter((_, itemIndex) => itemIndex !== index) }) : null} />)}</div><div className="form-columns"><Field label="طريقة التسليم"><select value={draft.delivery} onChange={(event) => selectDelivery(event.target.value)}>{deliveries.map((delivery) => <option value={delivery.id} key={delivery.id}>{delivery.label} — {currency.format(delivery.fee)}</option>)}</select></Field><Field label="رسوم التوصيل"><input type="number" min="0" value={draft.deliveryFee} onChange={(event) => setDraft({ ...draft, deliveryFee: Number(event.target.value) || 0 })} /></Field><Field label="تاريخ الطلب"><input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /></Field><Field label="الحالة"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}><option>جديد</option><option>قيد التجهيز</option><option>مكتمل</option><option>ملغي</option></select></Field></div>  {fulfilmentField}<Field label="ملاحظات العميلة"><input value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></Field><button className="primary-button full-width" type="submit">حفظ عملية البيع</button></form><SalePreview values={values} status={draft.status} /></section>
+  return <section className="sale-layout"><form className="panel sale-form" onSubmit={onSubmit}><div className="panel-heading"><div><h2>تفاصيل الطلب</h2><p>سعر البيع الفعلي لا ينقص عن سعر الجملة، وربح دانا يبقى ثابتًا.</p></div></div><div className="form-columns"><Field label="اسم العميلة"><input value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} required /></Field><Field label="المندوبة"><select value={draft.repId} onChange={(event) => setDraft({ ...draft, repId: event.target.value })}>{representatives.map((representative) => <option value={representative.id} key={representative.id}>{representative.name} — {representative.area}</option>)}</select></Field></div><div className="line-items"><div className="line-items-heading"><strong>المنتجات</strong><button className="text-button" type="button" onClick={() => setDraft({ ...draft, items: [...draft.items, { productId: '', quantity: 1, salePrice: '' }] })}>+ إضافة منتج</button></div>{draft.items.map((item, index) => <ProductPicker item={item} products={products} key={index} onSelect={(productId) => selectProduct(index, productId)} onChange={(field, value) => updateItem(index, field, value)} onRemove={draft.items.length > 1 ? () => setDraft({ ...draft, items: draft.items.filter((_, itemIndex) => itemIndex !== index) }) : null} />)}</div><div className="form-columns"><Field label="طريقة التسليم"><select value={draft.delivery} onChange={(event) => selectDelivery(event.target.value)}>{deliveries.map((delivery) => <option value={delivery.id} key={delivery.id}>{delivery.label} — {currency.format(delivery.fee)}</option>)}</select></Field><Field label="رسوم التوصيل"><input type="number" min="0" value={draft.deliveryFee} onChange={(event) => setDraft({ ...draft, deliveryFee: Number(event.target.value) || 0 })} /></Field><Field label="تاريخ الطلب"><input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /></Field><Field label="الحالة"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}><option>جديد</option><option>قيد التجهيز</option><option>مكتمل</option><option>ملغي</option></select></Field></div>{fulfilmentField}<Field label="ملاحظات العميلة"><input value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></Field><button className="primary-button full-width" type="submit">حفظ عملية البيع</button></form><SalePreview values={values} status={draft.status} /></section>
 }
 
 function ProductPicker({ item, products, onSelect, onChange, onRemove }) {
   const [query, setQuery] = useState('')
   const selected = products.find((product) => product.id === item.productId)
   const matches = products.filter((product) => `${product.name} ${product.brand} ${product.category}`.includes(query.trim()))
-  return <div className="sale-item product-picker"><div className="product-search"><input aria-label="ابحثي عن منتج" placeholder="ابحثي باسم المنتج…" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <div className="search-results">{matches.slice(0, 6).map((product) => <button type="button" key={product.id} onClick={() => { onSelect(product.id); setQuery('') }}><span>{product.name}</span><small>{currency.format(product.sellingPrice)}</small></button>)}</div>}</div><strong className="selected-product">{selected?.name}</strong><label className="compact-item-field">الكمية<input aria-label="الكمية" type="number" min="1" value={item.quantity} onChange={(event) => onChange('quantity', event.target.value)} /></label><label className="sale-price-field">سعر البيع الفعلي<input aria-label="سعر البيع الفعلي" type="number" min={selected?.sellingPrice || 0} value={Math.max(selected?.sellingPrice || 0, Number(item.salePrice) || 0)} onChange={(event) => onChange('salePrice', Number(event.target.value) || selected?.sellingPrice || 0)} /><small>الحد الأدنى {currency.format(selected?.sellingPrice || 0)}</small></label>{onRemove && <button className="remove-button" type="button" onClick={onRemove}>حذف</button>}</div>
+  const wholesalePrice = Number(selected?.representativePrice) || 0
+  return <div className="sale-item product-picker"><div className="product-search"><input aria-label="ابحثي عن منتج" placeholder="ابحثي باسم المنتج…" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <div className="search-results">{matches.slice(0, 6).map((product) => <button type="button" key={product.id} onClick={() => { onSelect(product.id); setQuery('') }}><span>{product.name}</span><small>{currency.format(normalizedSalePrice(product))}</small></button>)}</div>}</div><strong className="selected-product">{selected?.name || 'ابحثي واختاري منتجًا'}</strong><label className="compact-item-field">الكمية<input aria-label="الكمية" type="number" min="1" value={item.quantity} onChange={(event) => onChange('quantity', event.target.value)} /></label><label className="sale-price-field">سعر البيع الفعلي<input aria-label="سعر البيع الفعلي" type="number" min={wholesalePrice} value={selected ? normalizedSalePrice(selected, item.salePrice) : ''} disabled={!selected} onChange={(event) => onChange('salePrice', Number(event.target.value) || wholesalePrice)} /><small>{selected ? `الحد الأدنى سعر الجملة: ${currency.format(wholesalePrice)}` : 'اختاري منتجًا أولًا'}</small></label>{onRemove && <button className="remove-button" type="button" onClick={onRemove}>حذف</button>}</div>
 }
 
 function Products({ products, onChange, onRemove, onAdd }) {
-  return <section className="panel table-panel"><div className="panel-heading"><div><h2>كتالوج دانا بلس</h2><p>عدّلي الأسعار التي تحدد ربح دانا والمندوبة في كل عملية.</p></div><button className="primary-button" onClick={onAdd}>إضافة منتج</button></div><div className="product-table"><div className="product-table-head"><span>المنتج والتصنيف</span><span>التكلفة</span><span>سعر المندوبة</span><span>أقل سعر للعميلة</span><span>إجراء</span></div>{products.map((product) => <div className="product-table-row" key={product.id}><div><input aria-label="اسم المنتج" value={product.name} onChange={(event) => onChange(product.id, 'name', event.target.value)} /><input aria-label="التصنيف" className="sub-input" value={product.category} onChange={(event) => onChange(product.id, 'category', event.target.value)} /></div>{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <input aria-label={`${field} ${product.name}`} key={field} type="number" min="0" value={product[field]} onChange={(event) => onChange(product.id, field, event.target.value)} />)}<button className="remove-button" onClick={() => onRemove(product.id)}>حذف</button></div>)}</div></section>
+  return <section className="panel table-panel"><div className="panel-heading"><div><h2>كتالوج دانا بلس</h2><p>عدّلي سعر التكلفة وسعر الجملة وسعر البيع المقترح لكل منتج.</p></div><button className="primary-button" onClick={onAdd}>إضافة منتج</button></div><div className="product-table"><div className="product-table-head"><span>المنتج والتصنيف</span><span>سعر التكلفة</span><span>سعر الجملة</span><span>سعر البيع المقترح</span><span>إجراء</span></div>{products.map((product) => <div className="product-table-row" key={product.id}><div><input aria-label="اسم المنتج" value={product.name} onChange={(event) => onChange(product.id, 'name', event.target.value)} /><input aria-label="التصنيف" className="sub-input" value={product.category} onChange={(event) => onChange(product.id, 'category', event.target.value)} /></div>{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <input aria-label={`${field} ${product.name}`} key={field} type="number" min={field === 'sellingPrice' ? product.representativePrice : 0} value={product[field]} onChange={(event) => onChange(product.id, field, event.target.value)} />)}<button className="remove-button" onClick={() => onRemove(product.id)}>حذف</button></div>)}</div></section>
 }
 
 function Representatives({ summaries, onAdd, onChange }) {
@@ -369,7 +383,12 @@ function SalesTable({ sales, products, representatives, onStatusChange, title = 
 
 function ProductModal({ onClose, onSave }) {
   const [product, setProduct] = useState({ name: '', brand: '', category: '', purchasePrice: '', representativePrice: '', sellingPrice: '' })
-  return <Modal title="إضافة منتج" onClose={onClose}><form className="modal-form" onSubmit={(event) => { event.preventDefault(); onSave({ ...product, purchasePrice: Number(product.purchasePrice), representativePrice: Number(product.representativePrice), sellingPrice: Number(product.sellingPrice) }) }}><Field label="اسم المنتج"><input autoFocus required value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} /></Field><div className="form-columns"><Field label="العلامة التجارية"><input required value={product.brand} onChange={(event) => setProduct({ ...product, brand: event.target.value })} /></Field><Field label="التصنيف"><input required value={product.category} onChange={(event) => setProduct({ ...product, category: event.target.value })} /></Field></div><div className="form-columns">{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <Field label={field === 'purchasePrice' ? 'سعر التكلفة' : field === 'representativePrice' ? 'سعر المندوبة' : 'أقل سعر للعميلة'} key={field}><input required type="number" min="0" value={product[field]} onChange={(event) => setProduct({ ...product, [field]: event.target.value })} /></Field>)}</div><button className="primary-button">حفظ المنتج</button></form></Modal>
+  const submit = (event) => {
+    event.preventDefault()
+    const representativePrice = Number(product.representativePrice)
+    onSave({ ...product, purchasePrice: Number(product.purchasePrice), representativePrice, sellingPrice: Math.max(representativePrice, Number(product.sellingPrice)) })
+  }
+  return <Modal title="إضافة منتج" onClose={onClose}><form className="modal-form" onSubmit={submit}><Field label="اسم المنتج"><input autoFocus required value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} /></Field><div className="form-columns"><Field label="العلامة التجارية"><input required value={product.brand} onChange={(event) => setProduct({ ...product, brand: event.target.value })} /></Field><Field label="التصنيف"><input required value={product.category} onChange={(event) => setProduct({ ...product, category: event.target.value })} /></Field></div><div className="form-columns"><Field label="سعر التكلفة"><input required type="number" min="0" value={product.purchasePrice} onChange={(event) => setProduct({ ...product, purchasePrice: event.target.value })} /></Field><Field label="سعر الجملة"><input required type="number" min="0" value={product.representativePrice} onChange={(event) => setProduct({ ...product, representativePrice: event.target.value })} /></Field><Field label="سعر البيع المقترح"><input required type="number" min={product.representativePrice || 0} value={product.sellingPrice} onChange={(event) => setProduct({ ...product, sellingPrice: event.target.value })} /></Field></div><button className="primary-button">حفظ المنتج</button></form></Modal>
 }
 
 function RepresentativeModal({ onClose, onSave }) {
