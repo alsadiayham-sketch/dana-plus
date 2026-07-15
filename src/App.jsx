@@ -94,6 +94,7 @@ function App() {
   const [remoteReady, setRemoteReady] = useState(false)
   const [remoteError, setRemoteError] = useState('')
   const [modal, setModal] = useState('')
+  const [confirmation, setConfirmation] = useState(null)
   const applyingSnapshot = useRef(false)
 
   useEffect(() => {
@@ -176,10 +177,10 @@ function App() {
       setNotice('أضيفي اسم العميلة ومنتجًا واحدًا على الأقل.')
       return
     }
-    setData((current) => ({ ...current, sales: [{ ...draft, id: String(Date.now()), items: cleanItems, date: draft.date || new Date().toISOString().slice(0, 10) }, ...current.sales] }))
+    const savedSale = { ...draft, id: String(Date.now()), items: cleanItems, date: draft.date || new Date().toISOString().slice(0, 10) }
+    setData((current) => ({ ...current, sales: [savedSale, ...current.sales] }))
     setDraft(newSaleDraft())
-    setNotice('تم حفظ الطلب وحساب الأرباح تلقائيًا.')
-    setActivePage('sales')
+    setConfirmation(savedSale)
   }
 
   const updateProduct = (id, field, value) => setData((current) => ({
@@ -192,6 +193,7 @@ function App() {
     setData((current) => ({ ...current, products: [{ id, ...product }, ...current.products] }))
     setNotice('أُضيف المنتج إلى الكتالوج.')
   }
+  const removeProduct = (id) => setData((current) => ({ ...current, products: current.products.filter((product) => product.id !== id) }))
 
   const updateDelivery = (id, field, value) => setData((current) => ({
     ...current,
@@ -253,7 +255,7 @@ function App() {
         {activePage === 'sale' && <SaleForm draft={draft} setDraft={setDraft} representatives={data.representatives} products={data.products} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onSubmit={saveSale} />}
         {activePage === 'sales' && <SalesTable sales={data.sales} products={data.products} representatives={data.representatives} deliveries={data.deliveries} onStatusChange={updateSaleStatus} />}
         {activePage === 'cancelled' && <SalesTable sales={data.sales.filter((sale) => sale.status === 'ملغي')} products={data.products} representatives={data.representatives} deliveries={data.deliveries} onStatusChange={updateSaleStatus} title="الطلبات الملغاة" />}
-        {activePage === 'products' && <Products products={data.products} onChange={updateProduct} onAdd={() => setModal('product')} />}
+        {activePage === 'products' && <Products products={data.products} onChange={updateProduct} onRemove={removeProduct} onAdd={() => setModal('product')} />}
         {activePage === 'representatives' && <Representatives summaries={repSummary} onAdd={() => setModal('representative')} onChange={updateRepresentative} />}
         {activePage === 'payments' && <Payments representatives={repSummary} payments={data.payments} onSave={savePayment} onStatusChange={updatePaymentStatus} />}
         {activePage === 'pickup-locations' && <PickupLocations locations={data.pickupLocations} onAdd={addPickupLocation} onChange={updatePickupLocation} />}
@@ -261,6 +263,7 @@ function App() {
       </main>
       {modal === 'product' && <ProductModal onClose={() => setModal('')} onSave={(product) => { addProduct(product); setModal('') }} />}
       {modal === 'representative' && <RepresentativeModal onClose={() => setModal('')} onSave={(representative) => { addRepresentative(representative); setModal('') }} />}
+      {confirmation && <OrderConfirmation sale={confirmation} products={data.products} deliveries={data.deliveries} pickupLocations={data.pickupLocations} onClose={() => { setConfirmation(null); setActivePage('sales') }} />}
     </div>
   )
 }
@@ -317,8 +320,8 @@ function ProductPicker({ item, products, onSelect, onChange, onRemove }) {
   return <div className="sale-item product-picker"><div className="product-search"><input aria-label="ابحثي عن منتج" placeholder="ابحثي باسم المنتج…" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <div className="search-results">{matches.slice(0, 6).map((product) => <button type="button" key={product.id} onClick={() => { onSelect(product.id); setQuery('') }}><span>{product.name}</span><small>{currency.format(product.sellingPrice)}</small></button>)}</div>}</div><strong className="selected-product">{selected?.name}</strong><input aria-label="الكمية" type="number" min="1" value={item.quantity} onChange={(event) => onChange('quantity', event.target.value)} /><input aria-label="سعر البيع الفعلي" type="number" min={selected?.sellingPrice || 0} value={Math.max(selected?.sellingPrice || 0, Number(item.salePrice) || 0)} onChange={(event) => onChange('salePrice', Number(event.target.value) || selected?.sellingPrice || 0)} /><small>سعر البيع الفعلي · الحد الأدنى {currency.format(selected?.sellingPrice || 0)}</small>{onRemove && <button className="remove-button" type="button" onClick={onRemove}>حذف</button>}</div>
 }
 
-function Products({ products, onChange, onAdd }) {
-  return <section className="panel table-panel"><div className="panel-heading"><div><h2>كتالوج دانا بلس</h2><p>عدّلي الأسعار التي تحدد ربح دانا والمندوبة في كل عملية.</p></div><button className="primary-button" onClick={onAdd}>إضافة منتج</button></div><div className="product-table"><div className="product-table-head"><span>المنتج والتصنيف</span><span>التكلفة</span><span>سعر المندوبة</span><span>أقل سعر للعميلة</span></div>{products.map((product) => <div className="product-table-row" key={product.id}><div><input aria-label="اسم المنتج" value={product.name} onChange={(event) => onChange(product.id, 'name', event.target.value)} /><input aria-label="التصنيف" className="sub-input" value={product.category} onChange={(event) => onChange(product.id, 'category', event.target.value)} /></div>{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <input aria-label={`${field} ${product.name}`} key={field} type="number" min="0" value={product[field]} onChange={(event) => onChange(product.id, field, event.target.value)} />)}</div>)}</div></section>
+function Products({ products, onChange, onRemove, onAdd }) {
+  return <section className="panel table-panel"><div className="panel-heading"><div><h2>كتالوج دانا بلس</h2><p>عدّلي الأسعار التي تحدد ربح دانا والمندوبة في كل عملية.</p></div><button className="primary-button" onClick={onAdd}>إضافة منتج</button></div><div className="product-table"><div className="product-table-head"><span>المنتج والتصنيف</span><span>التكلفة</span><span>سعر المندوبة</span><span>أقل سعر للعميلة</span><span>إجراء</span></div>{products.map((product) => <div className="product-table-row" key={product.id}><div><input aria-label="اسم المنتج" value={product.name} onChange={(event) => onChange(product.id, 'name', event.target.value)} /><input aria-label="التصنيف" className="sub-input" value={product.category} onChange={(event) => onChange(product.id, 'category', event.target.value)} /></div>{['purchasePrice', 'representativePrice', 'sellingPrice'].map((field) => <input aria-label={`${field} ${product.name}`} key={field} type="number" min="0" value={product[field]} onChange={(event) => onChange(product.id, field, event.target.value)} />)}<button className="remove-button" onClick={() => onRemove(product.id)}>حذف</button></div>)}</div></section>
 }
 
 function Representatives({ summaries, onAdd, onChange }) {
@@ -366,6 +369,13 @@ function RepresentativeModal({ onClose, onSave }) {
 
 function Modal({ title, children, onClose }) {
   return <div className="modal-backdrop" role="presentation"><section className="modal" role="dialog" aria-modal="true" aria-label={title}><div className="panel-heading"><h2>{title}</h2><button className="text-button" onClick={onClose}>إغلاق</button></div>{children}</section></div>
+}
+
+function OrderConfirmation({ sale, products, deliveries, pickupLocations, onClose }) {
+  const delivery = deliveries.find((item) => item.id === sale.delivery)
+  const location = sale.delivery === 'pickup' ? pickupLocations.find((item) => item.id === sale.pickupLocation)?.name : sale.deliveryAddress
+  const details = [`طلب ${sale.customerName}`, ...sale.items.map((item) => { const product = products.find((candidate) => candidate.id === item.productId); return `${product?.name} × ${item.quantity}` }), `التسليم: ${sale.delivery === 'pickup' ? 'استلام' : delivery?.label}`, `الموقع: ${location || '—'}`, `المبلغ: ${currency.format(saleValues(sale, products).total)}`].join('\n')
+  return <Modal title="تم حفظ الطلب" onClose={onClose}><p className="confirmation-copy">راجعي الطلب ثم انسخي تفاصيله لإرسالها للعميلة.</p><pre className="order-copy">{details}</pre><button className="primary-button full-width" onClick={() => navigator.clipboard.writeText(details)}>نسخ تفاصيل الطلب</button></Modal>
 }
 
 function Metric({ title, value, detail, accent = false }) {

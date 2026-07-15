@@ -70,7 +70,7 @@ h2 { font-size: 18px; margin-bottom: 4px; text-wrap: balance; }
 .sales-head, .sales-row { display: grid; grid-template-columns: .75fr 1.25fr 2fr 1.15fr 1fr 1fr; gap: 12px; padding: 13px 8px; align-items: center; font-size: 13px; }
 .sales-head, .product-table-head { color: #5c6b80; font-size: 12px; background: #f5f7fa; font-weight: 700; }
 .sales-row { border-bottom: 1px solid #eef2f7; }
-.product-table-head, .product-table-row { display: grid; grid-template-columns: 2.3fr repeat(3, 1fr); gap: 12px; padding: 12px 8px; align-items: center; }
+.product-table-head, .product-table-row { display: grid; grid-template-columns: 2.3fr repeat(3, 1fr) 80px; gap: 12px; padding: 12px 8px; align-items: center; }
 .product-table-row { border-bottom: 1px solid #eef2f7; font-size: 13px; }
 .product-table-row input { direction: rtl; min-height: 38px; padding: 8px; }
 .sub-input { font-size: 12px; color: #546277 !important; margin-top: 5px; }
@@ -91,6 +91,8 @@ h2 { font-size: 18px; margin-bottom: 4px; text-wrap: balance; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: rgba(24, 37, 59, .55); }
 .modal { width: min(100%, 560px); max-height: calc(100vh - 40px); overflow: auto; background: #fff; border-radius: 12px; padding: 24px; }
 .modal-form { display: grid; gap: 16px; margin-top: 20px; }
+.confirmation-copy { color: #55716e; margin-top: 18px; }
+.order-copy { white-space: pre-wrap; direction: rtl; font: inherit; line-height: 1.9; background: #f5f7fa; padding: 14px; border-radius: 8px; }
 .delivery-panel { max-width: 720px; }
 .delivery-row { display: grid; grid-template-columns: 1fr 120px auto; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid #e7edf3; }
 .delivery-row small { display: block; color: #64748b; font-size: 12px; margin-top: 3px; }
